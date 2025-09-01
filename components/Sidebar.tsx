@@ -17,7 +17,7 @@ import {
   LightBulbIcon,
   ArrowRightIcon
 } from '@heroicons/react/24/outline'
-import { logger } from '@/lib/logger'
+import logger from '@/lib/logger'
 
 interface SidebarProps {
   activeTab: string

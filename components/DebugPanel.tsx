@@ -83,7 +83,7 @@ export default function DebugPanel({ isVisible, onToggle }: DebugPanelProps) {
   if (!isVisible) return null
 
   return (
-    <div className="fixed bottom-4 right-4 w-96 h-96 bg-dark-900 border border-dark-700 rounded-lg shadow-2xl z-50">
+    <div className="fixed bottom-4 right-32 w-96 h-96 bg-dark-900 border border-dark-700 rounded-lg shadow-2xl z-50">
       <div className="flex items-center justify-between p-3 border-b border-dark-700">
         <div className="flex items-center space-x-2">
           <BugAntIcon className="h-5 w-5 text-accent-500" />

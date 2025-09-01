@@ -11,8 +11,9 @@ export const metadata: Metadata = {
   description: 'CEO AI Implementation Framework - Autonomous operations with human oversight',
   keywords: 'CEO AI, autonomous operations, business management, AI assistant',
   authors: [{ name: 'CEO AI' }],
-  viewport: 'width=device-width, initial-scale=1',
 }
+
+
 
 export default function RootLayout({
   children,

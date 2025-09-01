@@ -16,7 +16,7 @@ export default function DebugPanelWrapper() {
       {/* Debug Toggle Button */}
       <button
         onClick={toggleDebug}
-        className="fixed bottom-4 right-4 z-40 p-3 bg-dark-800 hover:bg-dark-700 border border-dark-600 rounded-full shadow-lg transition-all duration-200 hover:scale-110"
+        className="fixed bottom-4 right-32 z-40 p-3 bg-dark-800 hover:bg-dark-700 border border-dark-600 rounded-full shadow-lg transition-all duration-200 hover:scale-110"
         title="Toggle Debug Panel"
       >
         <BugAntIcon className="h-6 w-6 text-accent-500" />

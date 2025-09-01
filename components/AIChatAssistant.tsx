@@ -54,33 +54,50 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
 
   // Initialize speech recognition
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).webkitSpeechRecognition
-      recognitionRef.current = new SpeechRecognition()
+    if (typeof window !== 'undefined') {
+      // Try standard SpeechRecognition first, then webkit fallback
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
       
-      recognitionRef.current.continuous = false
-      recognitionRef.current.interimResults = false
-      recognitionRef.current.lang = 'en-US'
-      
-      recognitionRef.current.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript
-        setTranscript(transcript)
-        handleVoiceCommand(transcript)
-      }
-      
-      recognitionRef.current.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error)
-        setIsListening(false)
-      }
-      
-      recognitionRef.current.onend = () => {
-        setIsListening(false)
+      if (SpeechRecognition) {
+        console.log('🎤 Speech recognition available, initializing...')
+        recognitionRef.current = new SpeechRecognition()
+        
+        recognitionRef.current.continuous = false
+        recognitionRef.current.interimResults = false
+        recognitionRef.current.lang = 'en-US'
+        
+        recognitionRef.current.onresult = (event: any) => {
+          console.log('🎤 Speech recognition result:', event.results[0][0].transcript)
+          const transcript = event.results[0][0].transcript
+          setTranscript(transcript)
+          handleVoiceCommand(transcript)
+        }
+        
+        recognitionRef.current.onerror = (event: any) => {
+          console.error('🎤 Speech recognition error:', event.error)
+          setIsListening(false)
+        }
+        
+        recognitionRef.current.onend = () => {
+          console.log('🎤 Speech recognition ended')
+          setIsListening(false)
+        }
+        
+        recognitionRef.current.onstart = () => {
+          console.log('🎤 Speech recognition started')
+        }
+        
+        console.log('🎤 Speech recognition initialized successfully')
+      } else {
+        console.error('🎤 Speech recognition not supported in this browser')
+        alert('Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari.')
       }
     }
   }, [])
 
   // Toggle voice recognition
   const toggleListening = () => {
+    console.log('🎤 Toggle listening clicked, current state:', isListening)
     if (isListening) {
       stopListening()
     } else {
@@ -89,15 +106,32 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
   }
 
   // Start voice recognition
-  const startListening = () => {
-    if (!recognitionRef.current) return
+  const startListening = async () => {
+    console.log('🎤 Starting voice recognition...')
+    
+    // Check microphone permissions first
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream.getTracks().forEach(track => track.stop()) // Stop the stream immediately
+      console.log('🎤 Microphone permission granted')
+    } catch (error) {
+      console.error('🎤 Microphone permission denied:', error)
+      alert('Please allow microphone access to use voice recognition')
+      return
+    }
+    
+    if (!recognitionRef.current) {
+      console.error('🎤 No recognition ref available')
+      return
+    }
     
     try {
       recognitionRef.current.start()
       setIsListening(true)
       setTranscript('')
+      console.log('🎤 Voice recognition started successfully')
     } catch (error) {
-      console.error('Error starting voice recognition:', error)
+      console.error('🎤 Error starting voice recognition:', error)
     }
   }
 
@@ -184,6 +218,8 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
 
   // Handle voice commands
   const handleVoiceCommand = async (command: string) => {
+    console.log('🎤 Voice command received:', command)
+    
     // Add user's voice command to chat
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -202,6 +238,7 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
     
     try {
       const aiResponse = await generateAIResponse(command)
+      console.log('🤖 Voice command AI Response received:', aiResponse)
       
       const newAIMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -220,6 +257,7 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
 
       // Navigate if the AI response includes navigation
       if (aiResponse.navigateTo) {
+        console.log('🧭 Navigation triggered to:', aiResponse.navigateTo)
         const navigateTo = aiResponse.navigateTo
         setTimeout(() => {
           // Show navigation notification
@@ -234,6 +272,7 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
           }, 3000)
 
           // Navigate to the page
+          console.log('🧭 Executing navigation to:', navigateTo)
           window.location.href = navigateTo
         }, 1000)
       }
@@ -253,6 +292,8 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
 
   // Enhanced AI response function that analyzes actual data
   const generateAIResponse = async (userMessage: string): Promise<{ message: string; navigateTo?: string }> => {
+    console.log('🤖 Generating AI response for:', userMessage)
+    
     // Get all available data
     const contacts = getContacts()
     const projects = contacts.flatMap(contact => contact.projects)
@@ -262,6 +303,7 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
     const userProfile = getUserProfile()
 
     const lowerMessage = userMessage.toLowerCase()
+    console.log('🤖 Lowercase message:', lowerMessage)
 
     // CEO-level strategic analysis requests
     if (lowerMessage.includes('strategy') || lowerMessage.includes('strategic') || lowerMessage.includes('insights') ||
@@ -542,6 +584,7 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
       }
 
       if (lowerMessage.includes('dashboard') || lowerMessage.includes('home') || lowerMessage.includes('main')) {
+        console.log('🧭 Dashboard navigation triggered for message:', lowerMessage)
         return {
           message: "I'll take you back to your main dashboard. Let me navigate you there now...",
           navigateTo: '/dashboard'
@@ -591,6 +634,7 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
     }
 
     // Default response for other queries
+    console.log('🤖 No specific navigation pattern matched, returning default response')
     return {
       message: "I can help you with:\n\n💰 **Financial Data**: Revenue, expenses, budget analysis\n👥 **Client Management**: Client info, project status, network overview\n📋 **Business Plans**: Goals, strategies, execution status\n📊 **Performance Metrics**: KPIs, progress tracking\n🎯 **Priority Items**: Urgent tasks, overdue projects\n\nWhat specific information would you like to see? I can both answer your questions AND navigate you to the right pages!"
     }
@@ -613,6 +657,7 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
 
     try {
       const aiResponse = await generateAIResponse(userMessage)
+      console.log('🤖 AI Response received:', aiResponse)
       
       const newAIMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -626,6 +671,7 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
 
       // Navigate if the AI response includes navigation
       if (aiResponse.navigateTo) {
+        console.log('🧭 Text message navigation triggered to:', aiResponse.navigateTo)
         const navigateTo = aiResponse.navigateTo // Type narrowing
         setTimeout(() => {
           // Show navigation notification
@@ -640,6 +686,7 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
           }, 3000)
 
           // Navigate to the page
+          console.log('🧭 Executing text message navigation to:', navigateTo)
           window.location.href = navigateTo
         }, 1000)
       }
@@ -676,7 +723,7 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
       {/* Floating Voice Recognition Button */}
       <button
         onClick={toggleListening}
-        className={`fixed bottom-6 right-24 w-14 h-14 rounded-full shadow-lg transition-all duration-200 z-50 flex items-center justify-center ${
+        className={`fixed bottom-6 left-6 w-14 h-14 rounded-full shadow-lg transition-all duration-200 z-50 flex items-center justify-center ${
           isListening 
             ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
             : 'bg-green-500 hover:bg-green-600'
@@ -689,8 +736,15 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
       
       {/* Voice Recognition Status Indicator */}
       {isListening && (
-        <div className="fixed bottom-20 right-24 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-medium shadow-lg z-50 animate-pulse">
+        <div className="fixed bottom-20 left-6 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-medium shadow-lg z-50 animate-pulse">
           🎤 Listening...
+        </div>
+      )}
+      
+      {/* Voice Recognition Click Indicator */}
+      {transcript && (
+        <div className="fixed bottom-20 left-6 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-medium shadow-lg z-50">
+          🎤 "{transcript}"
         </div>
       )}
 

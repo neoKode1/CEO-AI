@@ -86,7 +86,7 @@ export default function ClientManagement() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
-    const newClient: Contact = {
+    const newClient: Client = {
       id: `contact_${Date.now()}`,
       name: formData.name,
       contactPerson: formData.contactPerson || undefined,
