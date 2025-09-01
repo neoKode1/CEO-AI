@@ -12,6 +12,9 @@ yarn-error.log*
 .env.production.local
 .env*.local
 
+# Allow example environment files
+!.env.example
+
 # API Keys and sensitive data
 *.key
 *.pem
