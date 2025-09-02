@@ -27,6 +27,7 @@ interface Client {
   notes?: string
   followUpDate?: string
   relationshipType?: 'client' | 'collaborator' | 'vendor' | 'partner'
+  profileUrl?: string
   createdAt: string
   updatedAt: string
 }
