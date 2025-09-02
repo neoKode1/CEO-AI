@@ -44,16 +44,22 @@ const navigationItems = [
     description: 'Strategic and operational plans'
   },
   {
+    id: 'clients',
+    name: 'Clients',
+    icon: UserGroupIcon,
+    description: 'Client directory and projects'
+  },
+  {
     id: 'goals',
     name: 'Goals & Benchmarks',
     icon: LightBulbIcon,
     description: '3-6 month objectives and milestones'
   },
   {
-    id: 'network',
-    name: 'Network',
-    icon: UserGroupIcon,
-    description: 'Contacts and relationships'
+    id: 'collaborators',
+    name: 'Collaborators',
+    icon: BuildingOfficeIcon,
+    description: 'Collaborators, vendors, and partners'
   },
   {
     id: 'accounting',
@@ -66,6 +72,25 @@ const navigationItems = [
     name: 'Profile',
     icon: UserIcon,
     description: 'Personal settings and preferences'
+  },
+  {
+    id: 'tax-forms',
+    name: 'Tax Forms',
+    icon: DocumentTextIcon,
+    description: 'Tax forms and document management'
+  }
+  ,
+  {
+    id: 'documents',
+    name: 'Documents',
+    icon: DocumentTextIcon,
+    description: 'Upload and manage business documents'
+  },
+  {
+    id: 'contracts',
+    name: 'Contracts',
+    icon: DocumentTextIcon,
+    description: 'Generate and store contracts'
   }
 ]
 
@@ -96,6 +121,42 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
       // Navigate to main dashboard
       logger.trackWorkflow('Sidebar', 'handleTabChange', 'Navigating to dashboard page')
       window.location.href = '/dashboard'
+    } else if (tabId === 'plans') {
+      // Navigate to plans page
+      logger.trackWorkflow('Sidebar', 'handleTabChange', 'Navigating to plans page')
+      window.location.href = '/plans'
+    } else if (tabId === 'clients') {
+      // Navigate to clients page
+      logger.trackWorkflow('Sidebar', 'handleTabChange', 'Navigating to clients page')
+      window.location.href = '/clients'
+    } else if (tabId === 'goals') {
+      // Navigate to goals page
+      logger.trackWorkflow('Sidebar', 'handleTabChange', 'Navigating to goals page')
+      window.location.href = '/goals'
+    } else if (tabId === 'collaborators') {
+      // Navigate to collaborators page
+      logger.trackWorkflow('Sidebar', 'handleTabChange', 'Navigating to collaborators page')
+      window.location.href = '/collaborators'
+    } else if (tabId === 'accounting') {
+      // Navigate to accounting page
+      logger.trackWorkflow('Sidebar', 'handleTabChange', 'Navigating to accounting page')
+      window.location.href = '/accounting'
+    } else if (tabId === 'profile') {
+      // Navigate to profile page
+      logger.trackWorkflow('Sidebar', 'handleTabChange', 'Navigating to profile page')
+      window.location.href = '/profile'
+    } else if (tabId === 'tax-forms') {
+      // Navigate to tax forms page
+      logger.trackWorkflow('Sidebar', 'handleTabChange', 'Navigating to tax forms page')
+      window.location.href = '/tax-forms'
+    } else if (tabId === 'documents') {
+      // Navigate to documents page
+      logger.trackWorkflow('Sidebar', 'handleTabChange', 'Navigating to documents page')
+      window.location.href = '/documents'
+    } else if (tabId === 'contracts') {
+      // Navigate to contracts page
+      logger.trackWorkflow('Sidebar', 'handleTabChange', 'Navigating to contracts page')
+      window.location.href = '/contracts'
     } else {
       // For dashboard tabs, use the onTabChange callback
       // This ensures proper tab switching within the dashboard
@@ -201,13 +262,12 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
                 </button>
                 <button 
                   onClick={() => {
-                    // Always navigate to dashboard with specific tab
-                    window.location.href = '/dashboard?tab=network'
+                    window.location.href = '/collaborators'
                   }}
                   className="w-full flex items-center space-x-3 p-2 text-dark-300 hover:text-white hover:bg-dark-800 rounded-lg transition-colors"
                 >
                   <UserGroupIcon className="h-4 w-4" />
-                  <span className="text-sm">Add Contact</span>
+                  <span className="text-sm">Add Collaborator</span>
                 </button>
                 <button 
                   onClick={() => {

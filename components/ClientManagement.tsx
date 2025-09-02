@@ -12,6 +12,7 @@ import {
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
 import { saveContact, getContacts, updateContact } from '@/lib/storage'
+import URLContactImporter from '@/components/URLContactImporter'
 
 interface Client {
   id: string
@@ -25,6 +26,7 @@ interface Client {
   howMet?: string
   notes?: string
   followUpDate?: string
+  relationshipType?: 'client' | 'collaborator' | 'vendor' | 'partner'
   createdAt: string
   updatedAt: string
 }
@@ -58,6 +60,9 @@ export default function ClientManagement() {
     howMet: '',
     notes: ''
   })
+  const [relationshipType, setRelationshipType] = useState<'collaborator' | 'vendor' | 'partner'>('collaborator')
+  const [showImporter, setShowImporter] = useState(false)
+  const [profileUrl, setProfileUrl] = useState('')
   const [projectForm, setProjectForm] = useState({
     name: '',
     description: '',
@@ -80,23 +85,31 @@ export default function ClientManagement() {
 
   const loadClients = () => {
     const contacts = getContacts()
-    setClients(contacts)
+    // Show only collaborators/vendors/partners. Treat unknown as collaborator for backwards compatibility
+    const filtered = contacts.filter(c => (c.relationshipType ?? 'collaborator') !== 'client')
+    setClients(filtered as Client[])
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!formData.name.trim() && !formData.email.trim()) {
+      alert('Please provide at least a name or an email to add a contact.')
+      return
+    }
     
     const newClient: Client = {
       id: `contact_${Date.now()}`,
-      name: formData.name,
+      name: formData.name || 'Unnamed Contact',
       contactPerson: formData.contactPerson || undefined,
-      email: formData.email,
+      email: formData.email || '',
       phone: formData.phone || undefined,
       company: formData.company || undefined,
       industry: formData.industry || undefined,
       howMet: formData.howMet || undefined,
       notes: formData.notes || undefined,
       projects: [],
+      relationshipType: editingClient?.relationshipType ?? relationshipType,
+      profileUrl: profileUrl || undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }
@@ -105,6 +118,7 @@ export default function ClientManagement() {
       const updatedClient = {
         ...editingClient,
         ...newClient,
+        profileUrl: profileUrl || editingClient.profileUrl,
         updatedAt: new Date().toISOString()
       }
       updateContact(updatedClient)
@@ -123,6 +137,7 @@ export default function ClientManagement() {
       howMet: '',
       notes: ''
     })
+    setRelationshipType('collaborator')
     setShowAddForm(false)
     loadClients()
   }
@@ -212,15 +227,21 @@ export default function ClientManagement() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-white">Client Network</h2>
-          <p className="text-dark-300">Manage your client relationships and project history</p>
+          <h2 className="text-2xl font-bold text-white">Collaborators & Vendors</h2>
+          <p className="text-dark-300">Manage your collaborators, vendors, partners, and their project history</p>
         </div>
         <button
           onClick={() => setShowAddForm(true)}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
         >
           <PlusIcon className="h-5 w-5" />
-          <span>Add New Client</span>
+          <span>Add New Contact</span>
+        </button>
+        <button
+          onClick={() => setShowImporter(true)}
+          className="ml-3 bg-dark-700 hover:bg-dark-600 text-white px-4 py-2 rounded-lg border border-dark-600 transition-colors"
+        >
+          Import from URL
         </button>
       </div>
 
@@ -231,7 +252,7 @@ export default function ClientManagement() {
             <UserIcon className="h-8 w-8 text-blue-500" />
             <div>
               <p className="text-2xl font-bold text-white">{clients.length}</p>
-              <p className="text-dark-300">Total Clients</p>
+              <p className="text-dark-300">Total Collaborators</p>
             </div>
           </div>
         </div>
@@ -270,14 +291,14 @@ export default function ClientManagement() {
         </div>
       </div>
 
-      {/* Clients List */}
+      {/* Contacts List */}
       <div className="bg-dark-800 rounded-lg overflow-hidden">
         <div className="p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Your Clients</h3>
+          <h3 className="text-lg font-semibold text-white mb-4">Your Collaborators & Vendors</h3>
           {clients.length === 0 ? (
             <div className="text-center py-8">
               <UserIcon className="h-12 w-12 text-dark-400 mx-auto mb-4" />
-              <p className="text-dark-300">No clients added yet. Add your first client to get started!</p>
+              <p className="text-dark-300">No collaborators/vendors added yet. Add your first contact to get started!</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -285,7 +306,31 @@ export default function ClientManagement() {
                 <div key={client.id} className="bg-dark-700 p-4 rounded-lg">
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <h4 className="text-lg font-semibold text-white">{client.name}</h4>
+                      <div className="flex items-center space-x-2">
+                        {client.profileUrl ? (
+                          <a
+                            href={client.profileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-lg font-semibold text-white hover:underline"
+                            aria-label={`Open ${client.name} profile`}
+                          >
+                            {client.name}
+                          </a>
+                        ) : (
+                          <h4 className="text-lg font-semibold text-white">{client.name}</h4>
+                        )}
+                        {client.industry && client.industry.trim() !== '' && (
+                          <span className="text-xs px-2 py-1 rounded-full bg-accent-600/20 text-accent-300 border border-accent-600/30">
+                            {client.industry}
+                          </span>
+                        )}
+                        {(client.relationshipType || 'collaborator') && (
+                          <span className="text-xs px-2 py-1 rounded-full bg-dark-600 text-dark-200 border border-dark-500 capitalize">
+                            {client.relationshipType || 'collaborator'}
+                          </span>
+                        )}
+                      </div>
                       {client.company && (
                         <p className="text-dark-300 text-sm">{client.company}</p>
                       )}
@@ -320,6 +365,7 @@ export default function ClientManagement() {
                             howMet: client.howMet || '',
                             notes: client.notes || ''
                           })
+                          setRelationshipType((client.relationshipType as any) || 'collaborator')
                           setShowAddForm(true)
                         }}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors"
@@ -372,7 +418,7 @@ export default function ClientManagement() {
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-semibold text-white">
-                  {editingClient ? 'Edit Client' : 'Add New Client'}
+                  {editingClient ? 'Edit Contact' : 'Add New Contact'}
                 </h3>
                 <button
                   onClick={() => {
@@ -399,11 +445,10 @@ export default function ClientManagement() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-white text-sm font-medium mb-2">
-                      Client Name *
+                      Name
                     </label>
                     <input
                       type="text"
-                      required
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -422,11 +467,10 @@ export default function ClientManagement() {
                   </div>
                   <div>
                     <label className="block text-white text-sm font-medium mb-2">
-                      Email *
+                      Email
                     </label>
                     <input
                       type="email"
-                      required
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -454,18 +498,32 @@ export default function ClientManagement() {
                       className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-                                     <div>
+                  <div>
                      <label className="block text-white text-sm font-medium mb-2">
-                       Job Type
+                       Role / Specialty
                      </label>
                      <input
                        type="text"
                        value={formData.industry}
                        onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
-                       placeholder="Designer, Developer, Consultant, etc."
+                       placeholder="Designer, Developer, Vendor, etc."
                        className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                      />
                    </div>
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-2">
+                      Relationship Type
+                    </label>
+                    <select
+                      value={relationshipType}
+                      onChange={(e) => setRelationshipType(e.target.value as any)}
+                      className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="collaborator">Collaborator</option>
+                      <option value="vendor">Vendor</option>
+                      <option value="partner">Partner</option>
+                    </select>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-white text-sm font-medium mb-2">
@@ -478,6 +536,30 @@ export default function ClientManagement() {
                     placeholder="Referral, cold outreach, networking event, etc."
                     className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                </div>
+                <div>
+                  <label className="block text-white text-sm font-medium mb-2">
+                    Profile URL (optional)
+                  </label>
+                  <div className="flex space-x-2">
+                    <input
+                      type="url"
+                      value={profileUrl}
+                      onChange={(e) => setProfileUrl(e.target.value)}
+                      placeholder="https://linkedin.com/in/... or https://instagram.com/..."
+                      className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!profileUrl) return
+                        setShowImporter(true)
+                      }}
+                      className="px-3 py-2 bg-dark-600 hover:bg-dark-500 text-white rounded-lg border border-dark-500"
+                    >
+                      Import
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-white text-sm font-medium mb-2">
@@ -505,13 +587,43 @@ export default function ClientManagement() {
                     type="submit"
                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
                   >
-                    {editingClient ? 'Update Client' : 'Add Client'}
+                    {editingClient 
+                      ? 'Save Contact' 
+                      : relationshipType === 'vendor' 
+                        ? 'Add Vendor' 
+                        : relationshipType === 'partner' 
+                          ? 'Add Partner' 
+                          : 'Add Collaborator'}
                   </button>
                 </div>
               </form>
             </div>
           </div>
         </div>
+      )}
+
+      {/* URL Importer Modal */}
+      {showImporter && (
+        <URLContactImporter
+          initialUrl={profileUrl || undefined}
+          onImport={(data: any) => {
+            setFormData({
+              name: data?.name || '',
+              contactPerson: '',
+              email: data?.email || '',
+              phone: data?.phone || '',
+              company: data?.company || '',
+              industry: data?.industry || '',
+              howMet: data?.source ? `Imported from ${data.source}` : 'Imported',
+              notes: data?.profileUrl ? `Profile: ${data.profileUrl}` : (data?.bio || '')
+            })
+            setProfileUrl(data?.profileUrl || profileUrl)
+            setRelationshipType('collaborator')
+            setShowImporter(false)
+            setShowAddForm(true)
+          }}
+          onClose={() => setShowImporter(false)}
+        />
       )}
 
       {/* Add Project Modal */}

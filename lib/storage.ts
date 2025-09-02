@@ -74,6 +74,8 @@ export interface Contact {
   howMet?: string
   notes?: string
   followUpDate?: string
+  relationshipType?: 'client' | 'collaborator' | 'vendor' | 'partner'
+  profileUrl?: string
   createdAt: string
   updatedAt: string
 }
@@ -232,7 +234,31 @@ export const getContacts = (): Contact[] => {
   if (typeof window !== 'undefined') {
     const stored = localStorage.getItem('ceo-ai-contacts')
     if (stored) {
-      const contacts = JSON.parse(stored)
+      const contacts: Contact[] = JSON.parse(stored)
+      // Migration: default missing relationshipType to 'client' and lift profile URL out of notes
+      let mutated = false
+      const migrated = contacts.map((c) => {
+        let updated: Contact = c as Contact
+        if (!('relationshipType' in updated) || !updated.relationshipType) {
+          updated = { ...updated, relationshipType: 'client' as Contact['relationshipType'] }
+          mutated = true
+        }
+        if (!updated.profileUrl && typeof updated.notes === 'string') {
+          const match = updated.notes.match(/Profile:\s*(\S+)/)
+          if (match && match[1]) {
+            updated = { ...updated, profileUrl: match[1] }
+            mutated = true
+          }
+        }
+        return updated
+      })
+      if (mutated) {
+        localStorage.setItem('ceo-ai-contacts', JSON.stringify(migrated))
+        logger.trackDataOperation('Storage', 'getContacts', 'Migrated contacts to include relationshipType=client for legacy records', {
+          migratedCount: migrated.filter(c => c.relationshipType === 'client').length
+        })
+        return migrated
+      }
       logger.trackDataOperation('Storage', 'getContacts', 'Contacts retrieved successfully', {
         count: contacts.length
       })
@@ -253,6 +279,13 @@ export const updateContact = (updatedContact: Contact) => {
       existingContacts[contactIndex] = updatedContact
       localStorage.setItem('ceo-ai-contacts', JSON.stringify(existingContacts))
     }
+  }
+}
+
+export const removeContact = (contactId: string) => {
+  if (typeof window !== 'undefined') {
+    const existingContacts = getContacts().filter(contact => contact.id !== contactId)
+    localStorage.setItem('ceo-ai-contacts', JSON.stringify(existingContacts))
   }
 }
 
@@ -353,5 +386,119 @@ export const getIndustryConfig = (industry: string) => {
     ],
     projectStatuses: ['Planning', 'Active', 'Review', 'Completed'],
     fundingCategories: ['Business Loans', 'Grants', 'Investors', 'Partnerships']
+  }
+}
+
+// Documents & Contracts Storage
+
+export interface DocumentItem {
+  id: string
+  filename: string
+  mimeType: string
+  sizeBytes: number
+  category: 'license' | 'contract' | 'financial' | 'official' | 'other'
+  notes?: string
+  uploadedAt: string
+  // Base64 data URL (data:<mime>;base64,...) for preview/download; large files may impact storage size
+  dataUrl: string
+}
+
+export interface ContractItem {
+  id: string
+  title: string
+  purpose:
+    | 'nda'
+    | 'service-agreement'
+    | 'employment'
+    | 'msa'
+    | 'sow'
+    | 'custom'
+  parties: {
+    companyName: string
+    counterpartyName: string
+  }
+  effectiveDate: string
+  governingLaw?: string
+  paymentTerms?: string
+  scope?: string
+  termination?: string
+  additionalClauses?: string
+  content: string
+  createdAt: string
+  updatedAt: string
+}
+
+const DOCUMENTS_KEY = 'ceo-ai-documents'
+const CONTRACTS_KEY = 'ceo-ai-contracts'
+
+export const getDocuments = (): DocumentItem[] => {
+  if (typeof window !== 'undefined') {
+    const data = localStorage.getItem(DOCUMENTS_KEY)
+    return data ? JSON.parse(data) : []
+  }
+  return []
+}
+
+export const saveDocument = (doc: Omit<DocumentItem, 'id' | 'uploadedAt'>) => {
+  const documentItem: DocumentItem = {
+    ...doc,
+    id: `doc_${Date.now()}`,
+    uploadedAt: new Date().toISOString()
+  }
+  if (typeof window !== 'undefined') {
+    const existing = getDocuments()
+    existing.unshift(documentItem)
+    localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(existing))
+  }
+}
+
+export const removeDocument = (documentId: string) => {
+  if (typeof window !== 'undefined') {
+    const existing = getDocuments().filter(d => d.id !== documentId)
+    localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(existing))
+  }
+}
+
+export const getContracts = (): ContractItem[] => {
+  if (typeof window !== 'undefined') {
+    const data = localStorage.getItem(CONTRACTS_KEY)
+    return data ? JSON.parse(data) : []
+  }
+  return []
+}
+
+export const saveContract = (contract: Omit<ContractItem, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const newContract: ContractItem = {
+    ...contract,
+    id: `contract_${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }
+  if (typeof window !== 'undefined') {
+    const existing = getContracts()
+    existing.unshift(newContract)
+    localStorage.setItem(CONTRACTS_KEY, JSON.stringify(existing))
+  }
+}
+
+export const updateContract = (contractId: string, updates: Partial<ContractItem>) => {
+  if (typeof window !== 'undefined') {
+    const existing = getContracts()
+    const idx = existing.findIndex(c => c.id === contractId)
+    if (idx !== -1) {
+      existing[idx] = {
+        ...existing[idx],
+        ...updates,
+        updatedAt: new Date().toISOString()
+      }
+      localStorage.setItem(CONTRACTS_KEY, JSON.stringify(existing))
+    }
+  }
+}
+
+export const removeContract = (contractId: string) => {
+  if (typeof window !== 'undefined') {
+    const existing = getContracts().filter(c => c.id !== contractId)
+    localStorage.setItem(CONTRACTS_KEY, JSON.stringify(existing))
   }
 }

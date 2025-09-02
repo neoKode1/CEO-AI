@@ -216,6 +216,64 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
     return insights
   }
 
+  // Lightweight intent classification to guide responses and navigation
+  type AssistantIntent = 'navigation' | 'data_query' | 'app_info' | 'smalltalk' | 'unknown'
+
+  const classifyIntent = (message: string): AssistantIntent => {
+    const m = message.toLowerCase().trim()
+    if (!m) return 'unknown'
+
+    // Clear navigation verbs + targets
+    const navVerbs = ['navigate to', 'take me to', 'go to', 'open', 'view', 'show me']
+    const pages = ['agenda', 'dashboard', 'plans', 'goals', 'clients', 'network', 'collaborators', 'vendors', 'accounting', 'profile', 'tax', 'team', 'projects', 'communications', 'marketing', 'funding', 'budget']
+    const isNavVerb = navVerbs.some(v => m.includes(v))
+    const mentionsPage = pages.some(p => m.includes(p))
+    if (isNavVerb && mentionsPage) return 'navigation'
+
+    // Data queries
+    const dataMarkers = ['how many', 'what is', 'list', 'count', 'revenue', 'income', 'expenses', 'clients', 'projects', 'overdue', 'high priority', 'budget', 'analytics']
+    if (dataMarkers.some(w => m.includes(w))) return 'data_query'
+
+    // App info / help
+    if (m.includes('help') || m.includes('what can') || m.includes('how do i') || m.includes('features') || m.includes('where can i')) return 'app_info'
+
+    // Small talk
+    const smallTalk = ['hello', 'hi', 'hey', 'thank', 'how are you', 'good morning', 'good evening']
+    if (smallTalk.some(w => m.includes(w))) return 'smalltalk'
+
+    // Fallback
+    return 'unknown'
+  }
+
+  // Determine probable navigation target and confidence
+  const determineNavigationTarget = (message: string): { route?: string; label?: string; confidence: number } => {
+    const m = message.toLowerCase()
+    const candidates: Array<{ test: boolean; route: string; label: string }> = [
+      { test: m.includes('agenda'), route: '/agenda', label: 'Company Agenda' },
+      { test: m.includes('dashboard') || m.includes('home') || m.includes('main'), route: '/dashboard', label: 'Dashboard' },
+      { test: m.includes('plan'), route: '/plans', label: 'Plans & Execution' },
+      { test: m.includes('goal') || m.includes('benchmark') || m.includes('milestone'), route: '/goals', label: 'Goals & Benchmarks' },
+      { test: m.includes('client'), route: '/clients', label: 'Clients' },
+      { test: m.includes('collaborator') || m.includes('vendor') || m.includes('network') || m.includes('contacts') || m.includes('people'), route: '/collaborators', label: 'Collaborators & Vendors' },
+      { test: m.includes('accounting') || m.includes('invoice') || m.includes('payment'), route: '/accounting', label: 'Accounting' },
+      { test: m.includes('profile') || m.includes('settings'), route: '/profile', label: 'Profile' },
+      { test: m.includes('tax'), route: '/tax-forms', label: 'Tax Forms' },
+      { test: m.includes('team'), route: '/team', label: 'Team' },
+      { test: m.includes('project'), route: '/projects', label: 'Projects' },
+      { test: m.includes('communication'), route: '/communications', label: 'Communications' },
+      { test: m.includes('marketing'), route: '/marketing', label: 'Marketing' },
+      { test: m.includes('funding') || m.includes('investment'), route: '/funding', label: 'Funding' },
+      { test: m.includes('budget'), route: '/budget', label: 'Budget' }
+    ]
+    const match = candidates.find(c => c.test)
+    if (!match) return { confidence: 0 }
+
+    // Confidence: boost when nav verbs present
+    const navVerbs = ['navigate to', 'take me to', 'go to', 'open', 'view', 'show me']
+    const hasVerb = navVerbs.some(v => m.includes(v))
+    return { route: match.route, label: match.label, confidence: hasVerb ? 0.95 : 0.6 }
+  }
+
   // Handle voice commands
   const handleVoiceCommand = async (command: string) => {
     console.log('🎤 Voice command received:', command)
@@ -305,6 +363,35 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
     const lowerMessage = userMessage.toLowerCase()
     console.log('🤖 Lowercase message:', lowerMessage)
 
+    // First, classify intent and decide strategy
+    const intent = classifyIntent(userMessage)
+    const navGuess = determineNavigationTarget(userMessage)
+
+    // Handle small talk more conversationally
+    if (intent === 'smalltalk') {
+      if (lowerMessage.includes('thank')) {
+        return { message: "You're welcome! If you want, I can also pull up your dashboard or a specific area." }
+      }
+      return { message: "Hi! I’m here to help with insights, navigation, and your data. What would you like to do?" }
+    }
+
+    // Provide app info in a friendly way
+    if (intent === 'app_info') {
+      return {
+        message: "I can do three things for you: 1) Navigate anywhere in the app, 2) Answer questions about your data (revenue, clients, deadlines), and 3) Explain features or how-tos. Tell me something like ‘navigate to clients’, ‘what’s my total revenue?’, or ‘how do I add a collaborator?’."
+      }
+    }
+
+    // Fast-path: confident navigation
+    if (intent === 'navigation' && navGuess.route && navGuess.confidence >= 0.9) {
+      return { message: `Navigating to ${navGuess.label}...`, navigateTo: navGuess.route }
+    }
+
+    // Ambiguous navigation mention → confirm rather than auto-navigate
+    if (navGuess.route && navGuess.confidence > 0 && navGuess.confidence < 0.9) {
+      return { message: `Do you want me to open ${navGuess.label}, or would you like a quick summary first? Say “open ${navGuess.label}” or “summary”.` }
+    }
+
     // CEO-level strategic analysis requests
     if (lowerMessage.includes('strategy') || lowerMessage.includes('strategic') || lowerMessage.includes('insights') ||
         lowerMessage.includes('analysis') || lowerMessage.includes('overview') || lowerMessage.includes('summary') ||
@@ -334,7 +421,7 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
       }
     }
 
-    // Revenue and financial analysis
+    // Revenue and financial analysis (data query intent)
     if (lowerMessage.includes('revenue') || lowerMessage.includes('income') || lowerMessage.includes('earned')) {
       const totalRevenue = financialRecords
         .filter(record => record.type === 'income')
@@ -345,12 +432,12 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
       
       return {
         message: `Based on your data:\n\n💰 **Total Revenue**: $${totalRevenue.toLocaleString()}\n💳 **Amount Collected**: $${totalCollected.toLocaleString()}\n⏳ **Outstanding**: $${totalOutstanding.toLocaleString()}\n\nWould you like me to show you detailed financial breakdowns?`,
-        navigateTo: '/dashboard?tab=accounting'
+        navigateTo: '/accounting'
       }
     }
 
     // Client and project analysis
-    if (lowerMessage.includes('client') || lowerMessage.includes('project')) {
+    if ((lowerMessage.includes('client') || lowerMessage.includes('customer')) || lowerMessage.includes('project')) {
       const totalClients = contacts.length
       const activeProjects = projects.filter(p => p.status === 'in-progress').length
       const completedProjects = projects.filter(p => p.status === 'completed').length
@@ -358,7 +445,7 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
       
       return {
         message: `📊 **Client & Project Overview**:\n\n👥 **Total Clients**: ${totalClients}\n🚀 **Active Projects**: ${activeProjects}\n✅ **Completed Projects**: ${completedProjects}\n💵 **Total Project Value**: $${totalProjectValue.toLocaleString()}\n\nI can show you detailed client information or specific project statuses.`,
-        navigateTo: '/dashboard?tab=network'
+        navigateTo: lowerMessage.includes('client') || lowerMessage.includes('customer') ? '/clients' : '/collaborators'
       }
     }
 
@@ -376,7 +463,7 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
       
       return {
         message: `📊 **Client & Network Overview**:\n\n👥 **Total Clients**: ${totalClients}\n🚀 **Active Projects**: ${activeProjects}\n✅ **Completed Projects**: ${completedProjects}\n💵 **Total Project Value**: $${totalProjectValue.toLocaleString()}\n\nI can show you detailed client information, contact details, and project statuses.`,
-        navigateTo: '/dashboard?tab=network'
+        navigateTo: (lowerMessage.includes('client') || lowerMessage.includes('clients') || lowerMessage.includes('customer') || lowerMessage.includes('customers')) ? '/clients' : '/collaborators'
       }
     }
 
@@ -415,7 +502,7 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
       
       return {
         message: response,
-        navigateTo: '/dashboard?tab=network'
+        navigateTo: '/collaborators'
       }
     }
 
@@ -467,7 +554,7 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
       
       return {
         message: `📋 **Business Plans Status**:\n\n🔄 **Active Plans**: ${activePlans.length}\n✅ **Completed Plans**: ${completedPlans.length}\n📈 **Total Plans**: ${businessPlans.length}\n\nWould you like to see your current plans and execution status?`,
-        navigateTo: '/dashboard?tab=plans'
+        navigateTo: '/plans'
       }
     }
 
@@ -480,7 +567,7 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
       
       return {
         message: `🤝 **Network Overview**:\n\n👥 **Total Contacts**: ${totalContacts}\n🆕 **New This Month**: ${recentContacts}\n💼 **Active Projects**: ${projects.filter(p => p.status === 'in-progress').length}\n\nI can show you your complete contact network and client relationships.`,
-        navigateTo: '/dashboard?tab=network'
+        navigateTo: '/collaborators'
       }
     }
 
@@ -549,9 +636,12 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
       }
     }
 
-    // Navigation-specific requests (maintaining original navigation functionality)
-    if (lowerMessage.includes('show me') || lowerMessage.includes('take me to') || lowerMessage.includes('navigate to')) {
-      if (lowerMessage.includes('agenda') || lowerMessage.includes('priority')) {
+    // Enhanced direct navigation requests - these should be checked BEFORE other patterns
+    if (lowerMessage.includes('navigate to') || lowerMessage.includes('take me to') || lowerMessage.includes('show me') || 
+        lowerMessage.includes('go to') || lowerMessage.includes('open') || lowerMessage.includes('view')) {
+      
+      // Direct page navigation
+      if (lowerMessage.includes('agenda') || lowerMessage.includes('company agenda')) {
         if (lowerMessage.includes('high priority') || lowerMessage.includes('urgent')) {
           return {
             message: "I'll show you the high priority items on your agenda. Let me navigate you there now...",
@@ -594,36 +684,206 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
       if (lowerMessage.includes('plan') || lowerMessage.includes('execution') || lowerMessage.includes('strategy')) {
         return {
           message: "I'll show you your plans and execution status. Let me navigate you to the plans section...",
-          navigateTo: '/dashboard?tab=plans'
+          navigateTo: '/plans'
         }
       }
 
-      if (lowerMessage.includes('network') || lowerMessage.includes('contact') || lowerMessage.includes('client')) {
+      if (lowerMessage.includes('network') || lowerMessage.includes('contact') || lowerMessage.includes('collaborator') || lowerMessage.includes('vendor')) {
         return {
           message: "I'll show you your network contacts and client information. Let me navigate you to the network section...",
-          navigateTo: '/dashboard?tab=network'
+          navigateTo: '/collaborators'
+        }
+      }
+
+      if (lowerMessage.includes('client') || lowerMessage.includes('clients') || lowerMessage.includes('customer')) {
+        return {
+          message: "I'll show you your clients. Let me navigate you to the clients section...",
+          navigateTo: '/clients'
         }
       }
 
       if (lowerMessage.includes('goal') || lowerMessage.includes('benchmark') || lowerMessage.includes('milestone')) {
         return {
           message: "I'll show you your goals and benchmarks. Let me navigate you to the goals section...",
-          navigateTo: '/dashboard?tab=goals'
+          navigateTo: '/goals'
         }
       }
 
-      if (lowerMessage.includes('account') || lowerMessage.includes('analytics') || lowerMessage.includes('payment') || lowerMessage.includes('invoice')) {
+      if (lowerMessage.includes('accounting') || lowerMessage.includes('account') || lowerMessage.includes('analytics') || 
+          lowerMessage.includes('payment') || lowerMessage.includes('invoice') || lowerMessage.includes('financial')) {
         return {
           message: "I'll show you your accounting analytics and payment information. Let me navigate you to the accounting section...",
-          navigateTo: '/dashboard?tab=accounting'
+          navigateTo: '/accounting'
+        }
+      }
+
+      if (lowerMessage.includes('profile') || lowerMessage.includes('settings') || lowerMessage.includes('personal')) {
+        return {
+          message: "I'll take you to your profile and personal settings. Let me navigate you there now...",
+          navigateTo: '/profile'
+        }
+      }
+
+      if (lowerMessage.includes('tax') || lowerMessage.includes('tax forms')) {
+        return {
+          message: "I'll take you to your tax forms and document management. Let me navigate you there now...",
+          navigateTo: '/tax-forms'
+        }
+      }
+
+      if (lowerMessage.includes('documents') || lowerMessage.includes('files') || lowerMessage.includes('uploads')) {
+        return {
+          message: "I'll take you to your documents where you can upload business files. Navigating now...",
+          navigateTo: '/documents'
+        }
+      }
+
+      if (lowerMessage.includes('contract') || lowerMessage.includes('agreement')) {
+        return {
+          message: "I'll take you to your contracts section where you can generate agreements. Navigating now...",
+          navigateTo: '/contracts'
+        }
+      }
+
+      if (lowerMessage.includes('team') || lowerMessage.includes('staff') || lowerMessage.includes('employees')) {
+        return {
+          message: "I'll take you to your team management section. Let me navigate you there now...",
+          navigateTo: '/team'
+        }
+      }
+
+      if (lowerMessage.includes('project') || lowerMessage.includes('projects')) {
+        return {
+          message: "I'll take you to your projects overview. Let me navigate you there now...",
+          navigateTo: '/projects'
+        }
+      }
+
+      if (lowerMessage.includes('communication') || lowerMessage.includes('communications')) {
+        return {
+          message: "I'll take you to your communications management. Let me navigate you there now...",
+          navigateTo: '/communications'
+        }
+      }
+
+      if (lowerMessage.includes('marketing') || lowerMessage.includes('marketing strategy')) {
+        return {
+          message: "I'll take you to your marketing section. Let me navigate you there now...",
+          navigateTo: '/marketing'
+        }
+      }
+
+      if (lowerMessage.includes('funding') || lowerMessage.includes('fundraising') || lowerMessage.includes('investment')) {
+        return {
+          message: "I'll take you to your funding and investment section. Let me navigate you there now...",
+          navigateTo: '/funding'
         }
       }
     }
 
-    // General help responses
-    if (lowerMessage.includes('help') || lowerMessage.includes('what can you do')) {
+    // Direct page/tab requests without navigation verbs
+    if (lowerMessage.includes('agenda') && !lowerMessage.includes('navigate') && !lowerMessage.includes('take me') && !lowerMessage.includes('show me')) {
       return {
-        message: "I can help you with:\n\n💰 **Financial Data**: Revenue, expenses, budget analysis\n👥 **Client Management**: Client info, project status, network overview\n📋 **Business Plans**: Goals, strategies, execution status\n📊 **Performance Metrics**: KPIs, progress tracking\n🎯 **Priority Items**: Urgent tasks, overdue projects\n\nI can both answer questions about your data AND navigate you to relevant sections. Just ask me to show you what you need!"
+        message: "I'll take you to your company agenda where you can see all your priorities and deadlines. Let me navigate you there now...",
+        navigateTo: '/agenda'
+      }
+    }
+
+    if (lowerMessage.includes('network') && !lowerMessage.includes('navigate') && !lowerMessage.includes('take me') && !lowerMessage.includes('show me')) {
+      return {
+        message: "I'll show you your network contacts and client information. Let me navigate you to the network section...",
+        navigateTo: '/collaborators'
+      }
+    }
+
+    if ((lowerMessage.includes('client') || lowerMessage.includes('clients') || lowerMessage.includes('customer')) && !lowerMessage.includes('navigate') && !lowerMessage.includes('take me') && !lowerMessage.includes('show me')) {
+      return {
+        message: "I'll take you to your clients. Navigating now...",
+        navigateTo: '/clients'
+      }
+    }
+
+    if (lowerMessage.includes('accounting') && !lowerMessage.includes('navigate') && !lowerMessage.includes('take me') && !lowerMessage.includes('show me')) {
+      return {
+        message: "I'll show you your accounting analytics and payment information. Let me navigate you to the accounting section...",
+        navigateTo: '/dashboard?tab=accounting'
+      }
+    }
+
+    if (lowerMessage.includes('profile') && !lowerMessage.includes('navigate') && !lowerMessage.includes('take me') && !lowerMessage.includes('show me')) {
+      return {
+        message: "I'll take you to your profile and personal settings. Let me navigate you there now...",
+        navigateTo: '/profile'
+      }
+    }
+
+    if (lowerMessage.includes('tax') && !lowerMessage.includes('navigate') && !lowerMessage.includes('take me') && !lowerMessage.includes('show me')) {
+      return {
+        message: "I'll take you to your tax forms and document management. Let me navigate you there now...",
+        navigateTo: '/tax-forms'
+      }
+    }
+
+    if (lowerMessage.includes('team') && !lowerMessage.includes('navigate') && !lowerMessage.includes('take me') && !lowerMessage.includes('show me')) {
+      return {
+        message: "I'll take you to your team management section. Let me navigate you there now...",
+        navigateTo: '/team'
+      }
+    }
+
+    if (lowerMessage.includes('project') && !lowerMessage.includes('navigate') && !lowerMessage.includes('take me') && !lowerMessage.includes('show me')) {
+      return {
+        message: "I'll take you to your projects overview. Let me navigate you there now...",
+        navigateTo: '/projects'
+      }
+    }
+
+    if (lowerMessage.includes('communication') && !lowerMessage.includes('navigate') && !lowerMessage.includes('take me') && !lowerMessage.includes('show me')) {
+      return {
+        message: "I'll take you to your communications management. Let me navigate you there now...",
+        navigateTo: '/communications'
+      }
+    }
+
+    if (lowerMessage.includes('marketing') && !lowerMessage.includes('navigate') && !lowerMessage.includes('take me') && !lowerMessage.includes('show me')) {
+      return {
+        message: "I'll take you to your marketing section. Let me navigate you there now...",
+        navigateTo: '/marketing'
+      }
+    }
+
+    if (lowerMessage.includes('funding') && !lowerMessage.includes('navigate') && !lowerMessage.includes('take me') && !lowerMessage.includes('show me')) {
+      return {
+        message: "I'll take you to your funding and investment section. Let me navigate you there now...",
+        navigateTo: '/funding'
+      }
+    }
+
+    if (lowerMessage.includes('budget') && !lowerMessage.includes('navigate') && !lowerMessage.includes('take me') && !lowerMessage.includes('show me')) {
+      return {
+        message: "I'll take you to your budget overview where you can see all your financial information. Let me navigate you there now...",
+        navigateTo: '/budget'
+      }
+    }
+
+    if (lowerMessage.includes('documents') && !lowerMessage.includes('navigate') && !lowerMessage.includes('take me') && !lowerMessage.includes('show me')) {
+      return {
+        message: "I'll take you to your documents where you can upload business files. Navigating now...",
+        navigateTo: '/documents'
+      }
+    }
+
+    if ((lowerMessage.includes('contract') || lowerMessage.includes('agreement')) && !lowerMessage.includes('navigate') && !lowerMessage.includes('take me') && !lowerMessage.includes('show me')) {
+      return {
+        message: "I'll take you to your contracts section where you can generate agreements. Navigating now...",
+        navigateTo: '/contracts'
+      }
+    }
+
+    // General help responses
+    if (lowerMessage.includes('help') || lowerMessage.includes('what can you do') || lowerMessage.includes('navigation') || lowerMessage.includes('where can i go')) {
+      return {
+        message: "I can help you navigate to any section of your CEO dashboard! Here are the main areas:\n\n🏠 **Main Pages**:\n• Dashboard (overview & analytics)\n• Company Agenda (priorities & timeline)\n• Plans & Execution (strategic plans)\n• Goals & Benchmarks (objectives & milestones)\n\n👥 **Business Management**:\n• Network (contacts & clients)\n• Accounting (financial tracking)\n• Profile (personal settings)\n• Tax Forms (document management)\n\n📊 **Specialized Sections**:\n• Team (staff management)\n• Projects (project overview)\n• Communications (message management)\n• Marketing (strategy & campaigns)\n• Funding (investment & fundraising)\n• Budget (financial planning)\n\nJust say \"navigate to [section name]\" or \"take me to [section name]\" and I'll take you there! For example:\n• \"Navigate to Network\"\n• \"Take me to Accounting\"\n• \"Show me Profile\"\n• \"Go to Tax Forms\""
       }
     }
 
@@ -636,7 +896,7 @@ const AIChatAssistant = ({ className = '' }: AIChatAssistantProps) => {
     // Default response for other queries
     console.log('🤖 No specific navigation pattern matched, returning default response')
     return {
-      message: "I can help you with:\n\n💰 **Financial Data**: Revenue, expenses, budget analysis\n👥 **Client Management**: Client info, project status, network overview\n📋 **Business Plans**: Goals, strategies, execution status\n📊 **Performance Metrics**: KPIs, progress tracking\n🎯 **Priority Items**: Urgent tasks, overdue projects\n\nWhat specific information would you like to see? I can both answer your questions AND navigate you to the right pages!"
+      message: "Here’s how I can help: I can answer questions about your data (revenue, clients, deadlines), navigate anywhere for you, or explain features. What would you like to do next?"
     }
   }
 

@@ -231,47 +231,144 @@ export default function PaymentsPage() {
       .reduce((sum, payment) => sum + (payment.cryptoAmount || 0), 0)
   }
 
+  const calculateMonthlyRevenue = () => {
+    const currentMonth = new Date().getMonth()
+    const currentYear = new Date().getFullYear()
+    
+    return payments
+      .filter(p => p.status === 'completed')
+      .filter(p => {
+        const paymentDate = new Date(p.receivedAt)
+        return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear
+      })
+      .reduce((sum, payment) => sum + payment.amount, 0)
+  }
+
+  const calculatePendingRevenue = () => {
+    return invoices
+      .filter(i => i.status === 'sent')
+      .reduce((sum, invoice) => sum + invoice.amount, 0)
+  }
+
+  const calculateOverdueRevenue = () => {
+    return invoices
+      .filter(i => i.status === 'overdue')
+      .reduce((sum, invoice) => sum + invoice.amount, 0)
+  }
+
+  const getRevenueGrowth = () => {
+    const currentMonth = calculateMonthlyRevenue()
+    const lastMonth = payments
+      .filter(p => p.status === 'completed')
+      .filter(p => {
+        const paymentDate = new Date(p.receivedAt)
+        const lastMonthDate = new Date()
+        lastMonthDate.setMonth(lastMonthDate.getMonth() - 1)
+        return paymentDate.getMonth() === lastMonthDate.getMonth() && paymentDate.getFullYear() === lastMonthDate.getFullYear()
+      })
+      .reduce((sum, payment) => sum + payment.amount, 0)
+    
+    if (lastMonth === 0) return 0
+    return ((currentMonth - lastMonth) / lastMonth) * 100
+  }
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'overview':
         return (
           <div className="space-y-6">
             {/* Stats Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-dark-800 p-4 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <CurrencyDollarIcon className="h-8 w-8 text-green-500" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-dark-800 p-6 rounded-lg border border-dark-700">
+                <div className="flex items-center justify-between">
                   <div>
                     <p className="text-2xl font-bold text-white">${calculateTotalRevenue().toLocaleString()}</p>
-                    <p className="text-dark-300">Total Revenue</p>
+                    <p className="text-dark-300 text-sm">Total Revenue</p>
+                  </div>
+                  <div className="p-3 bg-green-500/20 rounded-lg">
+                    <CurrencyDollarIcon className="h-8 w-8 text-green-500" />
                   </div>
                 </div>
-              </div>
-              <div className="bg-dark-800 p-4 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <ArrowTrendingUpIcon className="h-8 w-8 text-blue-500" />
-                  <div>
-                    <p className="text-2xl font-bold text-white">{invoices.filter(i => i.status === 'paid').length}</p>
-                    <p className="text-dark-300">Paid Invoices</p>
-                  </div>
+                <div className="mt-4 flex items-center text-sm">
+                  <span className={`${getRevenueGrowth() >= 0 ? 'text-green-400' : 'text-red-400'} flex items-center`}>
+                    {getRevenueGrowth() >= 0 ? '↗' : '↘'} {Math.abs(getRevenueGrowth()).toFixed(1)}%
+                  </span>
+                  <span className="text-dark-400 ml-2">vs last month</span>
                 </div>
               </div>
-              <div className="bg-dark-800 p-4 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <ArrowTrendingDownIcon className="h-8 w-8 text-yellow-500" />
+              
+              <div className="bg-dark-800 p-6 rounded-lg border border-dark-700">
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-2xl font-bold text-white">{invoices.filter(i => i.status === 'overdue').length}</p>
-                    <p className="text-dark-300">Overdue</p>
+                    <p className="text-2xl font-bold text-white">${calculateMonthlyRevenue().toLocaleString()}</p>
+                    <p className="text-dark-300 text-sm">This Month</p>
+                  </div>
+                  <div className="p-3 bg-blue-500/20 rounded-lg">
+                    <ArrowTrendingUpIcon className="h-8 w-8 text-blue-500" />
                   </div>
                 </div>
+                <div className="mt-4">
+                  <p className="text-sm text-dark-400">Current month revenue</p>
+                </div>
               </div>
-              <div className="bg-dark-800 p-4 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <QrCodeIcon className="h-8 w-8 text-purple-500" />
+              
+              <div className="bg-dark-800 p-6 rounded-lg border border-dark-700">
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-2xl font-bold text-white">{cryptoWallets.filter(w => w.isActive).length}</p>
-                    <p className="text-dark-300">Active Crypto Wallets</p>
+                    <p className="text-2xl font-bold text-white">${calculatePendingRevenue().toLocaleString()}</p>
+                    <p className="text-dark-300 text-sm">Pending</p>
                   </div>
+                  <div className="p-3 bg-yellow-500/20 rounded-lg">
+                    <ClockIcon className="h-8 w-8 text-yellow-500" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <p className="text-sm text-dark-400">Awaiting payment</p>
+                </div>
+              </div>
+              
+              <div className="bg-dark-800 p-6 rounded-lg border border-dark-700">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-2xl font-bold text-white">${calculateOverdueRevenue().toLocaleString()}</p>
+                    <p className="text-dark-300 text-sm">Overdue</p>
+                  </div>
+                  <div className="p-3 bg-red-500/20 rounded-lg">
+                    <ExclamationTriangleIcon className="h-8 w-8 text-red-500" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <p className="text-sm text-dark-400">Past due invoices</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Revenue Chart */}
+            <div className="bg-dark-800 rounded-lg p-6 border border-dark-700">
+              <h3 className="text-lg font-semibold text-white mb-4">Revenue Overview</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-green-400 mb-2">
+                    ${calculateTotalRevenue().toLocaleString()}
+                  </div>
+                  <div className="text-dark-300 text-sm">Total Revenue</div>
+                  <div className="text-xs text-dark-400 mt-1">All time</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-400 mb-2">
+                    ${calculateMonthlyRevenue().toLocaleString()}
+                  </div>
+                  <div className="text-dark-300 text-sm">This Month</div>
+                  <div className="text-xs text-dark-400 mt-1">
+                    {getRevenueGrowth() >= 0 ? '+' : ''}{getRevenueGrowth().toFixed(1)}% vs last month
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-purple-400 mb-2">
+                    {cryptoWallets.filter(w => w.isActive).length}
+                  </div>
+                  <div className="text-dark-300 text-sm">Active Crypto Wallets</div>
+                  <div className="text-xs text-dark-400 mt-1">Ready for payments</div>
                 </div>
               </div>
             </div>
@@ -328,6 +425,34 @@ export default function PaymentsPage() {
               </button>
             </div>
 
+            {/* Invoice Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-dark-800 p-4 rounded-lg border border-dark-700">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-white">{invoices.length}</div>
+                  <div className="text-dark-300 text-sm">Total Invoices</div>
+                </div>
+              </div>
+              <div className="bg-dark-800 p-4 rounded-lg border border-dark-700">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-400">{invoices.filter(i => i.status === 'paid').length}</div>
+                  <div className="text-dark-300 text-sm">Paid</div>
+                </div>
+              </div>
+              <div className="bg-dark-800 p-4 rounded-lg border border-dark-700">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-yellow-400">{invoices.filter(i => i.status === 'sent').length}</div>
+                  <div className="text-dark-300 text-sm">Pending</div>
+                </div>
+              </div>
+              <div className="bg-dark-800 p-4 rounded-lg border border-dark-700">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-400">{invoices.filter(i => i.status === 'overdue').length}</div>
+                  <div className="text-dark-300 text-sm">Overdue</div>
+                </div>
+              </div>
+            </div>
+
             <div className="bg-dark-800 rounded-lg overflow-hidden">
               <div className="p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">All Invoices</h3>
@@ -339,33 +464,49 @@ export default function PaymentsPage() {
                 ) : (
                   <div className="space-y-3">
                     {invoices.map((invoice) => (
-                      <div key={invoice.id} className="bg-dark-700 p-4 rounded-lg">
-                        <div className="flex justify-between items-center">
+                      <div key={invoice.id} className="bg-dark-700 p-6 rounded-lg border border-dark-600 hover:border-dark-500 transition-colors">
+                        <div className="flex justify-between items-start">
                           <div className="flex-1">
-                            <div className="flex items-center space-x-3 mb-2">
+                            <div className="flex items-center space-x-3 mb-3">
                               {getStatusIcon(invoice.status)}
-                              <h4 className="text-white font-medium">{invoice.clientName}</h4>
-                              <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(invoice.status)}`}>
-                                {invoice.status}
+                              <h4 className="text-white font-semibold text-lg">{invoice.clientName}</h4>
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(invoice.status)}`}>
+                                {invoice.status.toUpperCase()}
                               </span>
                             </div>
-                            <div className="flex items-center space-x-4 text-sm text-dark-300">
-                              <span>Amount: ${invoice.amount.toLocaleString()} {invoice.currency}</span>
-                              {invoice.cryptoAmount && (
-                                <span>Crypto: {invoice.cryptoAmount} {invoice.cryptoCurrency}</span>
-                              )}
-                              <span>Due: {new Date(invoice.dueDate).toLocaleDateString()}</span>
-                              <span>Method: {invoice.paymentMethod}</span>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                              <div className="space-y-2">
+                                <div className="flex justify-between">
+                                  <span className="text-dark-300">Amount:</span>
+                                  <span className="text-white font-medium">${invoice.amount.toLocaleString()} {invoice.currency}</span>
+                                </div>
+                                {invoice.cryptoAmount && (
+                                  <div className="flex justify-between">
+                                    <span className="text-dark-300">Crypto:</span>
+                                    <span className="text-purple-400 font-medium">{invoice.cryptoAmount} {invoice.cryptoCurrency}</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="space-y-2">
+                                <div className="flex justify-between">
+                                  <span className="text-dark-300">Due Date:</span>
+                                  <span className="text-white">{new Date(invoice.dueDate).toLocaleDateString()}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-dark-300">Method:</span>
+                                  <span className="text-white">{invoice.paymentMethod}</span>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                          <div className="flex space-x-2">
-                            <button className="p-2 text-dark-300 hover:text-white transition-colors">
+                          <div className="flex space-x-2 ml-4">
+                            <button className="p-2 text-dark-300 hover:text-white hover:bg-dark-600 rounded-lg transition-colors" title="View Invoice">
                               <EyeIcon className="h-4 w-4" />
                             </button>
-                            <button className="p-2 text-dark-300 hover:text-white transition-colors">
+                            <button className="p-2 text-dark-300 hover:text-white hover:bg-dark-600 rounded-lg transition-colors" title="Edit Invoice">
                               <PencilIcon className="h-4 w-4" />
                             </button>
-                            <button className="p-2 text-dark-300 hover:text-white transition-colors">
+                            <button className="p-2 text-dark-300 hover:text-white hover:bg-dark-600 rounded-lg transition-colors" title="Delete Invoice">
                               <TrashIcon className="h-4 w-4" />
                             </button>
                           </div>
@@ -397,32 +538,29 @@ export default function PaymentsPage() {
             </div>
 
             {/* Crypto Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-dark-800 p-4 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <QrCodeIcon className="h-8 w-8 text-purple-500" />
-                  <div>
-                    <p className="text-2xl font-bold text-white">{cryptoWallets.filter(w => w.isActive).length}</p>
-                    <p className="text-dark-300">Active Wallets</p>
-                  </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-dark-800 p-4 rounded-lg border border-dark-700">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-400">{cryptoWallets.filter(w => w.isActive).length}</div>
+                  <div className="text-dark-300 text-sm">Active Wallets</div>
                 </div>
               </div>
-              <div className="bg-dark-800 p-4 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <CurrencyDollarIcon className="h-8 w-8 text-green-500" />
-                  <div>
-                    <p className="text-2xl font-bold text-white">{calculateCryptoRevenue().toFixed(4)}</p>
-                    <p className="text-dark-300">Total Crypto Revenue</p>
-                  </div>
+              <div className="bg-dark-800 p-4 rounded-lg border border-dark-700">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-400">{payments.filter(p => p.status === 'completed' && p.cryptoAmount).length}</div>
+                  <div className="text-dark-300 text-sm">Crypto Payments</div>
                 </div>
               </div>
-              <div className="bg-dark-800 p-4 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <ArrowTrendingUpIcon className="h-8 w-8 text-blue-500" />
-                  <div>
-                    <p className="text-2xl font-bold text-white">{payments.filter(p => p.cryptoAmount && p.status === 'completed').length}</p>
-                    <p className="text-dark-300">Crypto Payments</p>
-                  </div>
+              <div className="bg-dark-800 p-4 rounded-lg border border-dark-700">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-400">{cryptoWallets.reduce((sum, w) => sum + w.balance, 0).toFixed(8)}</div>
+                  <div className="text-dark-300 text-sm">Total Balance</div>
+                </div>
+              </div>
+              <div className="bg-dark-800 p-4 rounded-lg border border-dark-700">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-yellow-400">${calculateCryptoRevenue().toLocaleString()}</div>
+                  <div className="text-dark-300 text-sm">Crypto Revenue</div>
                 </div>
               </div>
             </div>
@@ -439,46 +577,67 @@ export default function PaymentsPage() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {cryptoWallets.map((wallet) => (
-                      <div key={wallet.id} className="bg-dark-700 p-4 rounded-lg">
+                      <div key={wallet.id} className="bg-dark-700 p-6 rounded-lg border border-dark-600 hover:border-dark-500 transition-colors">
                         <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h4 className="text-white font-medium text-lg">{wallet.currency} Wallet</h4>
-                            <p className="text-dark-300 text-sm">Balance: {wallet.balance} {wallet.currency}</p>
+                          <div className="flex items-center space-x-3">
+                            <div className="p-3 bg-purple-500/20 rounded-lg">
+                              <QrCodeIcon className="h-8 w-8 text-purple-500" />
+                            </div>
+                            <div>
+                              <h4 className="text-white font-semibold text-lg">{wallet.currency} Wallet</h4>
+                              <p className="text-dark-300 text-sm">Cryptocurrency Wallet</p>
+                            </div>
                           </div>
-                          <span className={`px-2 py-1 rounded-full text-xs ${wallet.isActive ? 'text-green-600 bg-green-100' : 'text-gray-600 bg-gray-100'}`}>
-                            {wallet.isActive ? 'Active' : 'Inactive'}
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${wallet.isActive ? 'text-green-600 bg-green-900/20' : 'text-gray-600 bg-gray-900/20'}`}>
+                            {wallet.isActive ? 'ACTIVE' : 'INACTIVE'}
                           </span>
                         </div>
                         
-                        <div className="mb-4">
-                          <p className="text-dark-300 text-sm mb-2">Wallet Address:</p>
-                          <div className="flex items-center space-x-2">
-                            <code className="bg-dark-600 px-2 py-1 rounded text-xs text-white font-mono">
-                              {wallet.address.slice(0, 8)}...{wallet.address.slice(-6)}
-                            </code>
-                            <button className="p-1 text-dark-300 hover:text-white transition-colors">
-                              <ClipboardDocumentIcon className="h-4 w-4" />
-                            </button>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-dark-300 text-sm">Balance:</span>
+                              <span className="text-white font-semibold">{wallet.balance.toFixed(8)} {wallet.currency}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-dark-300 text-sm">Status:</span>
+                              <span className={`text-sm ${wallet.isActive ? 'text-green-400' : 'text-gray-400'}`}>
+                                {wallet.isActive ? 'Ready for payments' : 'Disabled'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-dark-300 text-sm">Address:</span>
+                              <span className="text-dark-400 text-xs font-mono truncate max-w-32">{wallet.address}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-dark-300 text-sm">Created:</span>
+                              <span className="text-dark-400 text-xs">{new Date(wallet.createdAt).toLocaleDateString()}</span>
+                            </div>
                           </div>
                         </div>
 
                         <div className="mb-4">
-                          <p className="text-dark-300 text-sm mb-2">QR Code for Payments:</p>
-                          <div className="bg-white p-2 rounded inline-block">
+                          <p className="text-dark-300 text-sm mb-3">QR Code for Payments:</p>
+                          <div className="bg-white p-3 rounded-lg inline-block">
                             <img 
                               src={wallet.qrCode} 
                               alt={`${wallet.currency} QR Code`}
-                              className="w-24 h-24"
+                              className="w-20 h-20"
                             />
                           </div>
                         </div>
 
                         <div className="flex space-x-2">
-                          <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm transition-colors">
-                            View Transactions
+                          <button className="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm transition-colors">
+                            Copy Address
                           </button>
-                          <button className="px-3 py-2 text-dark-300 hover:text-white transition-colors">
+                          <button className="px-3 py-2 text-dark-300 hover:text-white hover:bg-dark-600 rounded-lg transition-colors" title="Edit Wallet">
                             <PencilIcon className="h-4 w-4" />
+                          </button>
+                          <button className="px-3 py-2 text-dark-300 hover:text-white hover:bg-dark-600 rounded-lg transition-colors" title="Delete Wallet">
+                            <TrashIcon className="h-4 w-4" />
                           </button>
                         </div>
                       </div>
@@ -553,29 +712,40 @@ export default function PaymentsPage() {
                 <h3 className="text-lg font-semibold text-white mb-4">All Payment Methods</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {paymentMethods.map((method) => (
-                    <div key={method.id} className="bg-dark-700 p-4 rounded-lg">
-                      <div className="flex justify-between items-start mb-3">
+                    <div key={method.id} className="bg-dark-700 p-6 rounded-lg border border-dark-600 hover:border-dark-500 transition-colors">
+                      <div className="flex justify-between items-start mb-4">
                         <div className="flex items-center space-x-3">
-                          {method.type === 'crypto' && <QrCodeIcon className="h-6 w-6 text-purple-500" />}
-                          {method.type === 'bank' && <BanknotesIcon className="h-6 w-6 text-green-500" />}
-                          {method.type === 'card' && <CreditCardIcon className="h-6 w-6 text-blue-500" />}
+                          <div className="p-3 rounded-lg">
+                            {method.type === 'crypto' && <div className="bg-purple-500/20"><QrCodeIcon className="h-6 w-6 text-purple-500" /></div>}
+                            {method.type === 'bank' && <div className="bg-green-500/20"><BanknotesIcon className="h-6 w-6 text-green-500" /></div>}
+                            {method.type === 'card' && <div className="bg-blue-500/20"><CreditCardIcon className="h-6 w-6 text-blue-500" /></div>}
+                          </div>
                           <div>
-                            <h4 className="text-white font-medium">{method.name}</h4>
+                            <h4 className="text-white font-semibold text-lg">{method.name}</h4>
                             <p className="text-dark-300 text-sm">{method.details}</p>
+                            <p className="text-dark-400 text-xs mt-1">Type: {method.type}</p>
                           </div>
                         </div>
-                        <span className={`px-2 py-1 rounded-full text-xs ${method.isActive ? 'text-green-600 bg-green-100' : 'text-gray-600 bg-gray-100'}`}>
-                          {method.isActive ? 'Active' : 'Inactive'}
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${method.isActive ? 'text-green-600 bg-green-900/20' : 'text-gray-600 bg-gray-900/20'}`}>
+                          {method.isActive ? 'ACTIVE' : 'INACTIVE'}
                         </span>
                       </div>
+                      
+                      <div className="mb-4">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-dark-300">Created:</span>
+                          <span className="text-dark-400">{new Date(method.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      
                       <div className="flex space-x-2">
-                        <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm transition-colors">
+                        <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm transition-colors">
                           {method.isActive ? 'Deactivate' : 'Activate'}
                         </button>
-                        <button className="px-3 py-2 text-dark-300 hover:text-white transition-colors">
+                        <button className="px-3 py-2 text-dark-300 hover:text-white hover:bg-dark-600 rounded-lg transition-colors" title="Edit Method">
                           <PencilIcon className="h-4 w-4" />
                         </button>
-                        <button className="px-3 py-2 text-dark-300 hover:text-white transition-colors">
+                        <button className="px-3 py-2 text-dark-300 hover:text-white hover:bg-dark-600 rounded-lg transition-colors" title="Delete Method">
                           <TrashIcon className="h-4 w-4" />
                         </button>
                       </div>
