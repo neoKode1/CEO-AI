@@ -74,6 +74,21 @@ export default function ProjectsPage() {
     setAllProjects(getAllProjects())
   }, [])
 
+  // Support deep-linking from contact modal: /projects?clientId=...&add=1
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const cid = params.get('clientId') || ''
+    const shouldAdd = params.get('add') === '1'
+    if (cid) {
+      setFilterClientId(cid)
+    }
+    if (cid && shouldAdd) {
+      setAddForm(prev => ({ ...prev, clientId: cid }))
+      setShowAddProject(true)
+    }
+  }, [])
+
   const contacts = getContacts()
   const visibleProjects = useMemo(() => {
     if (filterClientId === 'all') return allProjects

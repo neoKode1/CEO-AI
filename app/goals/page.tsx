@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getBusinessPlans, getOnboardingData } from '@/lib/storage'
+import { getOnboardingData, getGoals, createGoal, updateGoal, deleteGoal, addGoalMilestone, updateGoalMilestone, deleteGoalMilestone, type GoalItem } from '@/lib/storage'
 import HomeButton from '@/components/HomeButton'
 import Sidebar from '@/components/Sidebar'
 import {
@@ -42,7 +42,12 @@ interface Goal {
 
 export default function GoalsPage() {
   const [activeTab, setActiveTab] = useState('goals')
-  const [goals, setGoals] = useState<Goal[]>([])
+  const [goals, setGoals] = useState<GoalItem[]>([])
+  const [showGoalModal, setShowGoalModal] = useState(false)
+  const [editingGoal, setEditingGoal] = useState<GoalItem | null>(null)
+  const [goalForm, setGoalForm] = useState({
+    title: '', description: '', category: 'growth' as GoalItem['category'], target: '', current: '', unit: '', deadline: '', status: 'not-started' as GoalItem['status'], priority: 'medium' as GoalItem['priority'], notes: ''
+  })
   const [onboardingData, setOnboardingData] = useState<any>(null)
   const [filterCategory, setFilterCategory] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
@@ -52,8 +57,12 @@ export default function GoalsPage() {
     const onboarding = getOnboardingData()
     setOnboardingData(onboarding)
     
-    // Generate sample goals if none exist
-    generateSampleGoals(onboarding)
+    const saved = getGoals()
+    if (saved.length > 0) {
+      setGoals(saved)
+    } else {
+      generateSampleGoals(onboarding)
+    }
   }, [])
 
   const generateSampleGoals = (onboarding: any) => {
@@ -134,7 +143,9 @@ export default function GoalsPage() {
         createdAt: new Date().toISOString()
       }
     ]
-    setGoals(sampleGoals)
+    const seeded = sampleGoals as unknown as GoalItem[]
+    localStorage.setItem('ceo-ai-goals', JSON.stringify(seeded))
+    setGoals(seeded)
   }
 
   const handleTabChange = (tab: string) => {
@@ -182,6 +193,47 @@ export default function GoalsPage() {
   const getDaysRemaining = (deadline: string) => {
     const days = Math.ceil((new Date(deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
     return days > 0 ? days : 0
+  }
+
+  // Milestone actions (lightweight prompt-based UI for speed)
+  const handleAddMilestone = (goalId: string) => {
+    const title = window.prompt('Milestone title:') || ''
+    if (!title.trim()) return
+    const target = Number(window.prompt('Target value (number):') || '0') || 0
+    const current = Number(window.prompt('Current value (number):') || '0') || 0
+    const dueDate = window.prompt('Due date (YYYY-MM-DD):') || ''
+    const status = (window.prompt('Status (pending | in-progress | completed):') || 'pending').toLowerCase()
+    addGoalMilestone(goalId, {
+      title,
+      target,
+      current,
+      dueDate: dueDate ? new Date(dueDate).toISOString() : new Date().toISOString(),
+      status: (status === 'in-progress' || status === 'completed') ? (status as any) : 'pending'
+    })
+    setGoals(getGoals())
+  }
+
+  const handleEditMilestone = (goalId: string, milestone: { id: string; title: string; target: number; current: number; dueDate: string; status: 'pending' | 'in-progress' | 'completed' }) => {
+    const title = window.prompt('Milestone title:', milestone.title) || milestone.title
+    const target = Number(window.prompt('Target value (number):', String(milestone.target)) || String(milestone.target)) || milestone.target
+    const current = Number(window.prompt('Current value (number):', String(milestone.current)) || String(milestone.current)) || milestone.current
+    const dueStr = window.prompt('Due date (YYYY-MM-DD):', milestone.dueDate.split('T')[0]) || milestone.dueDate.split('T')[0]
+    const status = (window.prompt('Status (pending | in-progress | completed):', milestone.status) || milestone.status).toLowerCase()
+    updateGoalMilestone(goalId, {
+      id: milestone.id,
+      title,
+      target,
+      current,
+      dueDate: dueStr ? new Date(dueStr).toISOString() : milestone.dueDate,
+      status: (status === 'in-progress' || status === 'completed') ? (status as any) : 'pending'
+    })
+    setGoals(getGoals())
+  }
+
+  const handleDeleteMilestone = (goalId: string, milestoneId: string) => {
+    if (!window.confirm('Delete this milestone?')) return
+    deleteGoalMilestone(goalId, milestoneId)
+    setGoals(getGoals())
   }
 
   const filteredGoals = goals.filter(goal => {
@@ -328,7 +380,7 @@ export default function GoalsPage() {
                   <option value="medium">Medium</option>
                   <option value="low">Low</option>
                 </select>
-                <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2">
+                <button onClick={() => { setEditingGoal(null); setGoalForm({ title: '', description: '', category: 'growth', target: '', current: '', unit: '', deadline: '', status: 'not-started', priority: 'medium', notes: '' }); setShowGoalModal(true) }} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2">
                   <PlusIcon className="w-4 h-4" />
                   <span>New Goal</span>
                 </button>
@@ -401,7 +453,10 @@ export default function GoalsPage() {
 
                   {/* Milestones */}
                   <div className="mb-4">
-                    <h4 className="text-sm font-medium text-white mb-3">Milestones</h4>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-medium text-white">Milestones</h4>
+                      <button onClick={() => handleAddMilestone(goal.id)} className="px-3 py-1 rounded bg-dark-700 text-white hover:bg-dark-600 text-xs">Add Milestone</button>
+                    </div>
                     <div className="space-y-2">
                       {goal.milestones.map((milestone) => (
                         <div key={milestone.id} className="flex items-center justify-between bg-dark-700 rounded-lg px-3 py-2">
@@ -420,9 +475,11 @@ export default function GoalsPage() {
                               </span>
                             </div>
                           </div>
-                          <span className="text-xs text-dark-400">
-                            Due: {new Date(milestone.dueDate).toLocaleDateString()}
-                          </span>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs text-dark-400 mr-2">Due: {new Date(milestone.dueDate).toLocaleDateString()}</span>
+                            <button onClick={() => handleEditMilestone(goal.id, milestone)} className="px-2 py-1 rounded bg-dark-600 text-white hover:bg-dark-500 text-xs">Edit</button>
+                            <button onClick={() => handleDeleteMilestone(goal.id, milestone.id)} className="px-2 py-1 rounded bg-red-900/30 text-red-300 border border-red-800 hover:bg-red-900/40 text-xs">Delete</button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -437,8 +494,12 @@ export default function GoalsPage() {
                   )}
 
                   {/* Created Date */}
-                  <div className="text-xs text-dark-400">
-                    Created: {new Date(goal.createdAt).toLocaleDateString()}
+                  <div className="flex items-center justify-between text-xs text-dark-400">
+                    <span>Created: {new Date(goal.createdAt).toLocaleDateString()}</span>
+                    <div className="space-x-2">
+                      <button onClick={() => { setEditingGoal(goal); setGoalForm({ title: goal.title, description: goal.description, category: goal.category, target: String(goal.target), current: String(goal.current), unit: goal.unit, deadline: goal.deadline.split('T')[0], status: goal.status, priority: goal.priority, notes: goal.notes }); setShowGoalModal(true) }} className="px-3 py-1 rounded bg-dark-700 text-white hover:bg-dark-600">Edit</button>
+                      <button onClick={() => { deleteGoal(goal.id); setGoals(getGoals()) }} className="px-3 py-1 rounded bg-red-900/30 text-red-300 border border-red-800 hover:bg-red-900/40">Delete</button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -457,6 +518,92 @@ export default function GoalsPage() {
           </div>
         </div>
       </div>
+
+      {/* Goal Modal */}
+      {showGoalModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-dark-900 border border-dark-800 rounded-lg w-full max-w-2xl">
+            <div className="p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-white font-semibold">{editingGoal ? 'Edit Goal' : 'New Goal'}</h3>
+                <button onClick={() => setShowGoalModal(false)} className="text-dark-300 hover:text-white">✕</button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-dark-300 mb-1">Title</label>
+                  <input value={goalForm.title} onChange={(e) => setGoalForm({ ...goalForm, title: e.target.value })} className="input-field w-full" />
+                </div>
+                <div>
+                  <label className="block text-sm text-dark-300 mb-1">Category</label>
+                  <select value={goalForm.category} onChange={(e) => setGoalForm({ ...goalForm, category: e.target.value as any })} className="input-field w-full">
+                    <option value="revenue">Revenue</option>
+                    <option value="growth">Growth</option>
+                    <option value="operational">Operational</option>
+                    <option value="personal">Personal</option>
+                    <option value="team">Team</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-dark-300 mb-1">Target</label>
+                  <input type="number" value={goalForm.target} onChange={(e) => setGoalForm({ ...goalForm, target: e.target.value })} className="input-field w-full" />
+                </div>
+                <div>
+                  <label className="block text-sm text-dark-300 mb-1">Current</label>
+                  <input type="number" value={goalForm.current} onChange={(e) => setGoalForm({ ...goalForm, current: e.target.value })} className="input-field w-full" />
+                </div>
+                <div>
+                  <label className="block text-sm text-dark-300 mb-1">Unit</label>
+                  <input value={goalForm.unit} onChange={(e) => setGoalForm({ ...goalForm, unit: e.target.value })} className="input-field w-full" />
+                </div>
+                <div>
+                  <label className="block text-sm text-dark-300 mb-1">Deadline</label>
+                  <input type="date" value={goalForm.deadline} onChange={(e) => setGoalForm({ ...goalForm, deadline: e.target.value })} className="input-field w-full" />
+                </div>
+                <div>
+                  <label className="block text-sm text-dark-300 mb-1">Status</label>
+                  <select value={goalForm.status} onChange={(e) => setGoalForm({ ...goalForm, status: e.target.value as any })} className="input-field w-full">
+                    <option value="not-started">Not Started</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="on-track">On Track</option>
+                    <option value="at-risk">At Risk</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-dark-300 mb-1">Priority</label>
+                  <select value={goalForm.priority} onChange={(e) => setGoalForm({ ...goalForm, priority: e.target.value as any })} className="input-field w-full">
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm text-dark-300 mb-1">Description</label>
+                  <textarea value={goalForm.description} onChange={(e) => setGoalForm({ ...goalForm, description: e.target.value })} className="input-field w-full h-20 resize-none" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm text-dark-300 mb-1">Notes</label>
+                  <textarea value={goalForm.notes} onChange={(e) => setGoalForm({ ...goalForm, notes: e.target.value })} className="input-field w-full h-20 resize-none" />
+                </div>
+              </div>
+              <div className="flex items-center justify-end space-x-3 pt-2">
+                <button onClick={() => setShowGoalModal(false)} className="px-4 py-2 text-dark-300 hover:text-white">Cancel</button>
+                <button onClick={() => {
+                  if (editingGoal) {
+                    const updated: GoalItem = { ...editingGoal, title: goalForm.title, description: goalForm.description, category: goalForm.category, target: Number(goalForm.target)||0, current: Number(goalForm.current)||0, unit: goalForm.unit, deadline: goalForm.deadline ? new Date(goalForm.deadline).toISOString() : editingGoal.deadline, status: goalForm.status, priority: goalForm.priority, notes: goalForm.notes }
+                    updateGoal(updated)
+                    setGoals(getGoals())
+                  } else {
+                    const created = createGoal({ title: goalForm.title, description: goalForm.description, category: goalForm.category, target: Number(goalForm.target)||0, current: Number(goalForm.current)||0, unit: goalForm.unit, deadline: goalForm.deadline ? new Date(goalForm.deadline).toISOString() : new Date().toISOString(), status: goalForm.status, priority: goalForm.priority, milestones: [], notes: goalForm.notes })
+                    setGoals([created, ...goals])
+                  }
+                  setShowGoalModal(false)
+                }} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">{editingGoal ? 'Save Goal' : 'Create Goal'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

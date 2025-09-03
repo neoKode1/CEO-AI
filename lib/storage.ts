@@ -109,6 +109,102 @@ export interface FinancialRecord {
   createdAt: string
 }
 
+// Goals & Milestones
+export interface GoalMilestone {
+  id: string
+  title: string
+  target: number
+  current: number
+  dueDate: string
+  status: 'pending' | 'in-progress' | 'completed'
+}
+
+export interface GoalItem {
+  id: string
+  title: string
+  description: string
+  category: 'revenue' | 'growth' | 'operational' | 'personal' | 'team'
+  target: number
+  current: number
+  unit: string
+  deadline: string
+  status: 'not-started' | 'in-progress' | 'on-track' | 'at-risk' | 'completed'
+  priority: 'high' | 'medium' | 'low'
+  milestones: GoalMilestone[]
+  notes: string
+  createdAt: string
+}
+
+const GOALS_KEY = 'ceo-ai-goals'
+
+export const getGoals = (): GoalItem[] => {
+  if (typeof window === 'undefined') return []
+  const raw = localStorage.getItem(GOALS_KEY)
+  return raw ? JSON.parse(raw) : []
+}
+
+const setGoals = (goals: GoalItem[]) => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(GOALS_KEY, JSON.stringify(goals))
+}
+
+export const createGoal = (goal: Omit<GoalItem, 'id' | 'createdAt'>): GoalItem => {
+  const newGoal: GoalItem = {
+    ...goal,
+    id: `goal_${Date.now()}`,
+    createdAt: new Date().toISOString()
+  }
+  const goals = getGoals()
+  goals.unshift(newGoal)
+  setGoals(goals)
+  return newGoal
+}
+
+export const updateGoal = (updated: GoalItem) => {
+  const goals = getGoals()
+  const idx = goals.findIndex(g => g.id === updated.id)
+  if (idx !== -1) {
+    goals[idx] = updated
+    setGoals(goals)
+  }
+}
+
+export const deleteGoal = (goalId: string) => {
+  const goals = getGoals().filter(g => g.id !== goalId)
+  setGoals(goals)
+}
+
+export const addGoalMilestone = (goalId: string, milestone: Omit<GoalMilestone, 'id'>): GoalMilestone | null => {
+  const goals = getGoals()
+  const idx = goals.findIndex(g => g.id === goalId)
+  if (idx === -1) return null
+  const newMs: GoalMilestone = { ...milestone, id: `ms_${Date.now()}` }
+  goals[idx] = { ...goals[idx], milestones: [...goals[idx].milestones, newMs] }
+  setGoals(goals)
+  return newMs
+}
+
+export const updateGoalMilestone = (goalId: string, milestone: GoalMilestone) => {
+  const goals = getGoals()
+  const gi = goals.findIndex(g => g.id === goalId)
+  if (gi === -1) return
+  const mi = goals[gi].milestones.findIndex(m => m.id === milestone.id)
+  if (mi !== -1) {
+    const newMilestones = [...goals[gi].milestones]
+    newMilestones[mi] = milestone
+    goals[gi] = { ...goals[gi], milestones: newMilestones }
+    setGoals(goals)
+  }
+}
+
+export const deleteGoalMilestone = (goalId: string, milestoneId: string) => {
+  const goals = getGoals()
+  const gi = goals.findIndex(g => g.id === goalId)
+  if (gi === -1) return
+  goals[gi] = { ...goals[gi], milestones: goals[gi].milestones.filter(m => m.id !== milestoneId) }
+  setGoals(goals)
+}
+
 export const saveOnboardingData = (data: Omit<OnboardingData, 'completedAt'>) => {
   const onboardingData: OnboardingData = {
     ...data,
