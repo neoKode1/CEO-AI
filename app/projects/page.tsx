@@ -102,6 +102,21 @@ export default function ProjectsPage() {
     return 'bg-red-500'
   }
 
+  const progressPercent = (p: ClientProject): number => {
+    // Derive a simple progress percent based on status or amounts if available
+    switch (p.status) {
+      case 'completed':
+        return 100
+      case 'in-progress':
+        return 60
+      case 'on-hold':
+        return 40
+      case 'proposed':
+      default:
+        return 10
+    }
+  }
+
   return (
     <div className="min-h-screen bg-dark-950">
       {/* Sidebar */}
@@ -295,12 +310,12 @@ export default function ProjectsPage() {
                     <div className="mb-4">
                       <div className="flex justify-between text-sm mb-1">
                         <span className="text-dark-400">Progress</span>
-                        <span className="text-white">{project.progress}%</span>
+                        <span className="text-white">{progressPercent(project)}%</span>
                       </div>
                       <div className="w-full bg-dark-800 rounded-full h-2">
                         <div 
-                          className={`h-2 rounded-full ${getProgressColor(project.progress)}`}
-                          style={{ width: `${project.progress}%` }}
+                          className={`h-2 rounded-full ${getProgressColor(progressPercent(project))}`}
+                          style={{ width: `${progressPercent(project)}%` }}
                         ></div>
                       </div>
                     </div>
@@ -308,12 +323,12 @@ export default function ProjectsPage() {
                     {/* Project Details */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <span className="text-dark-400">Budget:</span>
-                        <span className="text-white ml-2">${project.budget.toLocaleString()}</span>
+                        <span className="text-dark-400">Value:</span>
+                        <span className="text-white ml-2">${project.projectValue.toLocaleString()}</span>
                       </div>
                       <div>
-                        <span className="text-dark-400">Spent:</span>
-                        <span className="text-white ml-2">${project.spent.toLocaleString()}</span>
+                        <span className="text-dark-400">Collected:</span>
+                        <span className="text-white ml-2">${project.amountCollected.toLocaleString()}</span>
                       </div>
                       <div>
                         <span className="text-dark-400">Start:</span>
@@ -321,7 +336,7 @@ export default function ProjectsPage() {
                       </div>
                       <div>
                         <span className="text-dark-400">End:</span>
-                        <span className="text-white ml-2">{project.endDate}</span>
+                        <span className="text-white ml-2">{project.completionDate || '-'}</span>
                       </div>
                     </div>
 
@@ -403,7 +418,7 @@ export default function ProjectsPage() {
           <div className="card">
             <h3 className="text-lg font-semibold text-white mb-4">Project Timeline</h3>
             <div className="space-y-6">
-              {projects.map((project) => (
+              {visibleProjects.map((project) => (
                 <div key={project.id} className="border-l-2 border-dark-700 pl-4">
                   <div className="flex items-center space-x-3 mb-2">
                     <div className="w-3 h-3 bg-accent-500 rounded-full"></div>
@@ -412,11 +427,11 @@ export default function ProjectsPage() {
                       {project.status.replace('-', ' ')}
                     </span>
                   </div>
-                  <p className="text-dark-400 text-sm mb-2">{project.startDate} - {project.endDate}</p>
+                  <p className="text-dark-400 text-sm mb-2">{project.startDate} - {project.completionDate || '-'}</p>
                   <div className="w-full bg-dark-800 rounded-full h-2">
                     <div 
-                      className={`h-2 rounded-full ${getProgressColor(project.progress)}`}
-                      style={{ width: `${project.progress}%` }}
+                      className={`h-2 rounded-full ${getProgressColor(progressPercent(project))}`}
+                      style={{ width: `${progressPercent(project)}%` }}
                     ></div>
                   </div>
                 </div>
