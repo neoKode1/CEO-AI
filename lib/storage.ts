@@ -221,9 +221,15 @@ export const saveContact = (contact: Contact) => {
   })
   
   if (typeof window !== 'undefined') {
-    const existingContacts = getContacts()
-    existingContacts.push(contact)
-    localStorage.setItem('ceo-ai-contacts', JSON.stringify(existingContacts))
+    try {
+      const existingContacts = getContacts()
+      existingContacts.push(contact)
+      localStorage.setItem('ceo-ai-contacts', JSON.stringify(existingContacts))
+    } catch (err) {
+      logger.trackDataOperation('Storage', 'saveContact', 'Failed to save contact to localStorage', {
+        error: String(err)
+      })
+    }
     logger.trackDataOperation('Storage', 'saveContact', 'Contact saved successfully')
   }
 }
@@ -270,14 +276,32 @@ export const getContacts = (): Contact[] => {
   return []
 }
 
+export const isLocalStorageAvailable = (): boolean => {
+  try {
+    if (typeof window === 'undefined') return false
+    const testKey = '__ceo_ai_storage_test__'
+    localStorage.setItem(testKey, '1')
+    localStorage.removeItem(testKey)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export const updateContact = (updatedContact: Contact) => {
   if (typeof window !== 'undefined') {
-    const existingContacts = getContacts()
-    const contactIndex = existingContacts.findIndex(contact => contact.id === updatedContact.id)
-    
-    if (contactIndex !== -1) {
-      existingContacts[contactIndex] = updatedContact
-      localStorage.setItem('ceo-ai-contacts', JSON.stringify(existingContacts))
+    try {
+      const existingContacts = getContacts()
+      const contactIndex = existingContacts.findIndex(contact => contact.id === updatedContact.id)
+      
+      if (contactIndex !== -1) {
+        existingContacts[contactIndex] = updatedContact
+        localStorage.setItem('ceo-ai-contacts', JSON.stringify(existingContacts))
+      }
+    } catch (err) {
+      logger.trackDataOperation('Storage', 'updateContact', 'Failed to update contact in localStorage', {
+        error: String(err)
+      })
     }
   }
 }
@@ -287,6 +311,35 @@ export const removeContact = (contactId: string) => {
     const existingContacts = getContacts().filter(contact => contact.id !== contactId)
     localStorage.setItem('ceo-ai-contacts', JSON.stringify(existingContacts))
   }
+}
+
+// Aggregate all projects with their owning client
+export interface ClientProject extends Project {
+  clientId: string
+  clientName: string
+}
+
+export const getAllProjects = (): ClientProject[] => {
+  const contacts = getContacts()
+  const projects: ClientProject[] = []
+  contacts.forEach(contact => {
+    contact.projects.forEach(p => {
+      projects.push({ ...p, clientId: contact.id, clientName: contact.name })
+    })
+  })
+  return projects
+}
+
+// Add a project to a client by id and return the created project with id
+export const addProjectToContact = (contactId: string, project: Omit<Project, 'id'>): Project | null => {
+  const contacts = getContacts()
+  const idx = contacts.findIndex(c => c.id === contactId)
+  if (idx === -1) return null
+  const newProject: Project = { ...project, id: Date.now().toString() }
+  const updated = { ...contacts[idx] }
+  updated.projects = [...updated.projects, newProject]
+  updateContact(updated)
+  return newProject
 }
 
 // Financial Records Management

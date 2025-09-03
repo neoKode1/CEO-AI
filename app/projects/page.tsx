@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import HomeButton from '@/components/HomeButton'
 import Sidebar from '@/components/Sidebar'
 import { 
@@ -17,73 +17,22 @@ import {
   VideoCameraIcon,
   PhotoIcon
 } from '@heroicons/react/24/outline'
+import { getAllProjects, getContacts, addProjectToContact, type ClientProject } from '@/lib/storage'
 
-// Mock project data
-const projects = [
-  {
-    id: 1,
-    name: 'Project Alpha - Documentary',
-    status: 'in-production',
-    progress: 65,
-    budget: 25000,
-    spent: 16250,
-    startDate: '2024-01-01',
-    endDate: '2024-06-30',
-    team: ['Chad Neo', 'Sarah Chen', 'Mike Rodriguez'],
-    description: 'Feature-length documentary exploring AI in modern filmmaking',
-    tasks: [
-      { id: 1, name: 'Principal Photography', status: 'completed', assignee: 'Sarah Chen' },
-      { id: 2, name: 'Post-Production Editing', status: 'in-progress', assignee: 'Mike Rodriguez' },
-      { id: 3, name: 'Sound Design', status: 'pending', assignee: 'Chad Neo' },
-      { id: 4, name: 'Color Grading', status: 'pending', assignee: 'Sarah Chen' }
-    ]
-  },
-  {
-    id: 2,
-    name: 'Project Beta - Short Film',
-    status: 'pre-production',
-    progress: 25,
-    budget: 8000,
-    spent: 2000,
-    startDate: '2024-02-01',
-    endDate: '2024-04-30',
-    team: ['Chad Neo', 'Alex Johnson'],
-    description: 'Experimental short film using AI-generated visuals',
-    tasks: [
-      { id: 1, name: 'Script Development', status: 'completed', assignee: 'Chad Neo' },
-      { id: 2, name: 'Location Scouting', status: 'in-progress', assignee: 'Alex Johnson' },
-      { id: 3, name: 'Casting', status: 'pending', assignee: 'Chad Neo' },
-      { id: 4, name: 'Equipment Rental', status: 'pending', assignee: 'Alex Johnson' }
-    ]
-  },
-  {
-    id: 3,
-    name: 'Project Gamma - Commercial',
-    status: 'post-production',
-    progress: 85,
-    budget: 12000,
-    spent: 10200,
-    startDate: '2023-11-01',
-    endDate: '2024-02-28',
-    team: ['Chad Neo', 'Sarah Chen', 'Mike Rodriguez', 'Lisa Wang'],
-    description: 'Corporate commercial for tech startup',
-    tasks: [
-      { id: 1, name: 'Filming', status: 'completed', assignee: 'Sarah Chen' },
-      { id: 2, name: 'Editing', status: 'completed', assignee: 'Mike Rodriguez' },
-      { id: 3, name: 'Client Review', status: 'in-progress', assignee: 'Chad Neo' },
-      { id: 4, name: 'Final Delivery', status: 'pending', assignee: 'Lisa Wang' }
-    ]
+const computeProjectStats = (projects: ClientProject[]) => {
+  const total = projects.length
+  const toNum = (n: any) => (typeof n === 'number' && !Number.isNaN(n) ? n : 0)
+  const totalBudget = projects.reduce((sum, p) => sum + toNum(p.projectValue), 0)
+  const totalSpent = projects.reduce((sum, p) => sum + toNum(p.amountCollected), 0)
+  return {
+    total,
+    inProduction: projects.filter(p => p.status === 'in-progress').length,
+    preProduction: projects.filter(p => p.status === 'proposed').length,
+    postProduction: projects.filter(p => p.status === 'on-hold').length,
+    completed: projects.filter(p => p.status === 'completed').length,
+    totalBudget,
+    totalSpent
   }
-]
-
-const projectStats = {
-  total: 3,
-  inProduction: 1,
-  preProduction: 1,
-  postProduction: 1,
-  completed: 0,
-  totalBudget: 45000,
-  totalSpent: 28450
 }
 
 const resourceAllocation = [
@@ -104,7 +53,33 @@ const upcomingMilestones = [
 export default function ProjectsPage() {
   const [activeTab, setActiveTab] = useState('overview')
   const [showAddProject, setShowAddProject] = useState(false)
-  const [selectedProject, setSelectedProject] = useState<number | null>(null)
+  const [selectedProject, setSelectedProject] = useState<string | null>(null)
+  const [allProjects, setAllProjects] = useState<ClientProject[]>([])
+  const [filterClientId, setFilterClientId] = useState<string>('all')
+  const [addForm, setAddForm] = useState({
+    clientId: '',
+    name: '',
+    description: '',
+    projectType: '',
+    status: 'proposed' as 'completed' | 'in-progress' | 'on-hold' | 'proposed',
+    startDate: '',
+    completionDate: '',
+    projectValue: '',
+    amountCollected: '',
+    paymentStatus: 'outstanding' as 'paid' | 'partial' | 'outstanding',
+    paymentTerms: ''
+  })
+
+  useEffect(() => {
+    setAllProjects(getAllProjects())
+  }, [])
+
+  const contacts = getContacts()
+  const visibleProjects = useMemo(() => {
+    if (filterClientId === 'all') return allProjects
+    return allProjects.filter(p => p.clientId === filterClientId)
+  }, [allProjects, filterClientId])
+  const projectStats = computeProjectStats(visibleProjects)
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -304,7 +279,7 @@ export default function ProjectsPage() {
 
         {activeTab === 'projects' && (
           <div className="space-y-6">
-            {projects.map((project) => (
+            {visibleProjects.map((project) => (
               <div key={project.id} className="card">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
@@ -350,16 +325,9 @@ export default function ProjectsPage() {
                       </div>
                     </div>
 
-                    {/* Team */}
-                    <div className="mt-4">
-                      <p className="text-sm text-dark-400 mb-2">Team:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {project.team.map((member) => (
-                          <span key={member} className="text-xs bg-dark-800 text-dark-300 px-2 py-1 rounded">
-                            {member}
-                          </span>
-                        ))}
-                      </div>
+                    <div className="mt-4 text-sm text-dark-400">
+                      <span className="mr-2">Client:</span>
+                      <span className="text-white">{project.clientName}</span>
                     </div>
                   </div>
                   
@@ -370,37 +338,30 @@ export default function ProjectsPage() {
                     >
                       {selectedProject === project.id ? 'Hide Tasks' : 'View Tasks'}
                     </button>
-                    <button className="btn-primary text-sm">Edit Project</button>
                   </div>
                 </div>
 
                 {/* Tasks (expandable) */}
                 {selectedProject === project.id && (
                   <div className="mt-4 pt-4 border-t border-dark-800">
-                    <h4 className="text-white font-medium mb-3">Tasks</h4>
-                    <div className="space-y-2">
-                      {project.tasks.map((task) => (
-                        <div key={task.id} className="flex items-center justify-between p-3 bg-dark-800 rounded-lg">
-                          <div className="flex items-center space-x-3">
-                            {task.status === 'completed' && (
-                              <CheckCircleIcon className="h-4 w-4 text-green-500" />
-                            )}
-                            {task.status === 'in-progress' && (
-                              <ClockIcon className="h-4 w-4 text-blue-500" />
-                            )}
-                            {task.status === 'pending' && (
-                              <ExclamationTriangleIcon className="h-4 w-4 text-yellow-500" />
-                            )}
-                            <span className="text-white text-sm">{task.name}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-dark-400 text-sm">{task.assignee}</span>
-                            <span className={`text-xs px-2 py-1 rounded ${getStatusColor(task.status)}`}>
-                              {task.status}
-                            </span>
-                          </div>
+                    <h4 className="text-white font-medium mb-3">Meta</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="text-dark-400">Payment:</span>
+                        <span className="text-white ml-2">{project.paymentStatus}</span>
+                      </div>
+                      {project.paymentTerms && (
+                        <div>
+                          <span className="text-dark-400">Terms:</span>
+                          <span className="text-white ml-2">{project.paymentTerms}</span>
                         </div>
-                      ))}
+                      )}
+                      {project.notes && (
+                        <div className="md:col-span-2">
+                          <span className="text-dark-400">Notes:</span>
+                          <span className="text-white ml-2">{project.notes}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -470,13 +431,56 @@ export default function ProjectsPage() {
         <div className="fixed inset-0 bg-dark-950/80 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-dark-900 border border-dark-800 rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold text-white mb-4">Add New Project</h3>
-            <form className="space-y-4">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (!addForm.clientId || !addForm.name) return
+                const created = addProjectToContact(addForm.clientId, {
+                  name: addForm.name,
+                  description: addForm.description,
+                  projectType: addForm.projectType,
+                  status: addForm.status,
+                  startDate: addForm.startDate,
+                  completionDate: addForm.completionDate || undefined,
+                  projectValue: parseFloat(addForm.projectValue || '0') || 0,
+                  amountCollected: parseFloat(addForm.amountCollected || '0') || 0,
+                  paymentStatus: addForm.paymentStatus,
+                  paymentTerms: addForm.paymentTerms,
+                  notes: undefined
+                })
+                if (created) {
+                  setAllProjects(getAllProjects())
+                  setShowAddProject(false)
+                  setAddForm({
+                    clientId: '', name: '', description: '', projectType: '', status: 'proposed', startDate: '', completionDate: '', projectValue: '', amountCollected: '', paymentStatus: 'outstanding', paymentTerms: ''
+                  })
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">
+                  Client
+                </label>
+                <select
+                  value={addForm.clientId}
+                  onChange={(e) => setAddForm({ ...addForm, clientId: e.target.value })}
+                  className="input-field w-full"
+                >
+                  <option value="">Select client</option>
+                  {contacts.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-dark-300 mb-2">
                   Project Name
                 </label>
-                <input 
-                  type="text" 
+                <input
+                  value={addForm.name}
+                  onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                  type="text"
                   className="input-field w-full"
                   placeholder="Enter project name"
                 />
@@ -485,7 +489,9 @@ export default function ProjectsPage() {
                 <label className="block text-sm font-medium text-dark-300 mb-2">
                   Description
                 </label>
-                <textarea 
+                <textarea
+                  value={addForm.description}
+                  onChange={(e) => setAddForm({ ...addForm, description: e.target.value })}
                   className="input-field w-full h-20 resize-none"
                   placeholder="Enter project description"
                 />
@@ -495,8 +501,10 @@ export default function ProjectsPage() {
                   <label className="block text-sm font-medium text-dark-300 mb-2">
                     Budget
                   </label>
-                  <input 
-                    type="number" 
+                  <input
+                    value={addForm.projectValue}
+                    onChange={(e) => setAddForm({ ...addForm, projectValue: e.target.value })}
+                    type="number"
                     className="input-field w-full"
                     placeholder="0"
                   />
@@ -505,11 +513,15 @@ export default function ProjectsPage() {
                   <label className="block text-sm font-medium text-dark-300 mb-2">
                     Status
                   </label>
-                  <select className="input-field w-full">
-                    <option>Pre-Production</option>
-                    <option>In Production</option>
-                    <option>Post-Production</option>
-                    <option>Completed</option>
+                  <select
+                    value={addForm.status}
+                    onChange={(e) => setAddForm({ ...addForm, status: e.target.value as any })}
+                    className="input-field w-full"
+                  >
+                    <option value="proposed">Proposed</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="on-hold">On Hold</option>
+                    <option value="completed">Completed</option>
                   </select>
                 </div>
               </div>
@@ -518,8 +530,10 @@ export default function ProjectsPage() {
                   <label className="block text-sm font-medium text-dark-300 mb-2">
                     Start Date
                   </label>
-                  <input 
-                    type="date" 
+                  <input
+                    value={addForm.startDate}
+                    onChange={(e) => setAddForm({ ...addForm, startDate: e.target.value })}
+                    type="date"
                     className="input-field w-full"
                   />
                 </div>
@@ -527,11 +541,45 @@ export default function ProjectsPage() {
                   <label className="block text-sm font-medium text-dark-300 mb-2">
                     End Date
                   </label>
-                  <input 
-                    type="date" 
+                  <input
+                    value={addForm.completionDate}
+                    onChange={(e) => setAddForm({ ...addForm, completionDate: e.target.value })}
+                    type="date"
                     className="input-field w-full"
                   />
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-dark-300 mb-2">Amount Collected</label>
+                  <input
+                    value={addForm.amountCollected}
+                    onChange={(e) => setAddForm({ ...addForm, amountCollected: e.target.value })}
+                    type="number"
+                    className="input-field w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-dark-300 mb-2">Payment Status</label>
+                  <select
+                    value={addForm.paymentStatus}
+                    onChange={(e) => setAddForm({ ...addForm, paymentStatus: e.target.value as any })}
+                    className="input-field w-full"
+                  >
+                    <option value="outstanding">Outstanding</option>
+                    <option value="partial">Partial</option>
+                    <option value="paid">Paid</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">Payment Terms</label>
+                <input
+                  value={addForm.paymentTerms}
+                  onChange={(e) => setAddForm({ ...addForm, paymentTerms: e.target.value })}
+                  className="input-field w-full"
+                  placeholder="Net 30, 50% upfront, etc."
+                />
               </div>
               <div className="flex space-x-3">
                 <button 
