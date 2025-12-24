@@ -7,16 +7,12 @@ import Sidebar from '@/components/Sidebar'
 import {
   CurrencyDollarIcon,
   PlusIcon,
-  ChartBarIcon,
   DocumentTextIcon,
-  ClockIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
   BanknotesIcon,
-  CreditCardIcon,
-  ReceiptRefundIcon
 } from '@heroicons/react/24/outline'
 
 interface Invoice {
