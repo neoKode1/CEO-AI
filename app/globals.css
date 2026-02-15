@@ -2,56 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
-
 @layer base {
-  html {
-    font-family: 'Inter', system-ui, sans-serif;
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
   }
-  
-  body {
-    @apply bg-black text-dark-100;
-  }
-}
 
-@layer components {
-  .btn-primary {
-    @apply bg-accent-600 hover:bg-accent-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 focus:ring-offset-dark-950;
+  * {
+    @apply border-border;
   }
-  
-  .btn-secondary {
-    @apply bg-dark-800 hover:bg-dark-700 text-dark-100 font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-dark-600 focus:ring-offset-2 focus:ring-offset-dark-950;
-  }
-  
-  .card {
-    @apply bg-dark-900 border border-dark-800 rounded-lg p-6 shadow-lg;
-  }
-  
-  .input-field {
-    @apply bg-dark-800 border border-dark-700 text-dark-100 placeholder-dark-400 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent;
-  }
-  
-  .gradient-text {
-    @apply bg-gradient-to-r from-accent-400 to-accent-600 bg-clip-text text-transparent;
-  }
-  
-  .glass-effect {
-    @apply bg-dark-900/80 backdrop-blur-sm border border-dark-800/50;
+
+  body {
+    @apply bg-background text-foreground;
   }
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  @keyframes blob {
+    0% {
+      transform: translate(0px, 0px) scale(1);
+    }
+    33% {
+      transform: translate(30px, -50px) scale(1.1);
+    }
+    66% {
+      transform: translate(-20px, 20px) scale(0.9);
+    }
+    100% {
+      transform: translate(0px, 0px) scale(1);
+    }
   }
-  
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+
+  .animate-blob {
+    animation: blob 7s infinite;
   }
-  
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
+
+  .animation-delay-2000 {
+    animation-delay: 2s;
+  }
+
+  .animation-delay-4000 {
+    animation-delay: 4s;
   }
 }
