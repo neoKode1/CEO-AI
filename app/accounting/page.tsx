@@ -185,240 +185,248 @@ export default function AccountingPage() {
       : 'text-red-400 bg-red-900/20'
   }
 
-  const filteredInvoices = invoices.filter(invoice => {
-    if (filterInvoiceStatus !== 'all' && invoice.status !== filterInvoiceStatus) return false
-    return true
-  })
+  const filteredInvoices = invoices.filter(invoice => 
+    filterInvoiceStatus === 'all' || invoice.status === filterInvoiceStatus
+  )
 
-  const filteredTransactions = transactions.filter(transaction => {
-    if (filterTransactionType !== 'all' && transaction.type !== filterTransactionType) return false
-    return true
-  })
+  const filteredTransactions = transactions.filter(transaction =>
+    filterTransactionType === 'all' || transaction.type === filterTransactionType
+  )
 
-  const stats = {
-    totalInvoices: invoices.length,
-    paidInvoices: invoices.filter(inv => inv.status === 'paid').length,
-    overdueInvoices: invoices.filter(inv => inv.status === 'overdue').length,
-    totalRevenue: invoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + inv.amount, 0),
-    pendingAmount: invoices.filter(inv => inv.status === 'sent').reduce((sum, inv) => sum + inv.amount, 0),
-    overdueAmount: invoices.filter(inv => inv.status === 'overdue').reduce((sum, inv) => sum + inv.amount, 0)
-  }
+  const totalRevenue = transactions
+    .filter(t => t.type === 'income' && t.status === 'completed')
+    .reduce((sum, t) => sum + t.amount, 0)
 
-  const financialSummary = {
-    totalIncome: transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0),
-    totalExpenses: transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0),
-    netIncome: transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0) - 
-               transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
-  }
+  const totalExpenses = transactions
+    .filter(t => t.type === 'expense' && t.status === 'completed')
+    .reduce((sum, t) => sum + t.amount, 0)
 
-  const getDaysOverdue = (dueDate: string) => {
-    const days = Math.ceil((new Date().getTime() - new Date(dueDate).getTime()) / (1000 * 60 * 60 * 24))
-    return days > 0 ? days : 0
-  }
+  const netProfit = totalRevenue - totalExpenses
+  const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0
+
+  const outstandingInvoices = invoices
+    .filter(inv => inv.status === 'sent' || inv.status === 'overdue')
+    .reduce((sum, inv) => sum + inv.amount, 0)
+
+  const overdueInvoices = invoices.filter(inv => inv.status === 'overdue')
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Header */}
-      <div className="bg-dark-900 border-b border-dark-700 p-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-white">Accounting</h1>
-          <HomeButton />
-        </div>
-      </div>
-
-      <div className="flex">
-        {/* Sidebar */}
-        <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
-
-        {/* Main Content */}
-        <div className="flex-1 p-6">
-          <div className="max-w-7xl mx-auto">
-            {/* Page Header */}
-            <div className="mb-6">
-              <h2 className="text-3xl font-bold text-white mb-2">Financial Tracking & Invoicing</h2>
-              <p className="text-dark-300">Manage your invoices, track income and expenses, and monitor your financial health</p>
-            </div>
-
-            {/* Financial Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-              <div className="bg-dark-800 rounded-lg p-6 border border-dark-700">
-                <div className="flex items-center space-x-3 mb-4">
-                  <ArrowTrendingUpIcon className="w-8 h-8 text-green-400" />
-                  <div>
-                    <p className="text-2xl font-bold text-white">${financialSummary.totalIncome.toLocaleString()}</p>
-                    <p className="text-dark-300 text-sm">Total Income</p>
-                  </div>
-                </div>
+    <div className="flex h-screen bg-black">
+      <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
+      
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <header className="bg-black border-b border-gray-800">
+          <div className="px-8 py-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-white">Accounting & Finance</h1>
+                <p className="mt-1 text-gray-400">Manage invoices, transactions, and financial reporting</p>
               </div>
-              <div className="bg-dark-800 rounded-lg p-6 border border-dark-700">
-                <div className="flex items-center space-x-3 mb-4">
-                  <ArrowTrendingDownIcon className="w-8 h-8 text-red-400" />
-                  <div>
-                    <p className="text-2xl font-bold text-white">${financialSummary.totalExpenses.toLocaleString()}</p>
-                    <p className="text-dark-300 text-sm">Total Expenses</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-dark-800 rounded-lg p-6 border border-dark-700">
-                <div className="flex items-center space-x-3 mb-4">
-                  <BanknotesIcon className="w-8 h-8 text-blue-400" />
-                  <div>
-                    <p className={`text-2xl font-bold ${financialSummary.netIncome >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      ${financialSummary.netIncome.toLocaleString()}
-                    </p>
-                    <p className="text-dark-300 text-sm">Net Income</p>
-                  </div>
-                </div>
+              <div className="flex items-center gap-4">
+                <button
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                >
+                  <PlusIcon className="h-5 w-5" />
+                  New Invoice
+                </button>
+                <HomeButton />
               </div>
             </div>
+          </div>
+        </header>
 
-            {/* Invoice Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-dark-800 rounded-lg p-4 border border-dark-700">
-                <div className="flex items-center space-x-3">
-                  <DocumentTextIcon className="w-8 h-8 text-blue-400" />
+        <main className="flex-1 overflow-auto bg-black">
+          <div className="px-8 py-6 space-y-6">
+            {/* Financial Overview Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-2xl font-bold text-white">{stats.totalInvoices}</p>
-                    <p className="text-dark-300 text-sm">Total Invoices</p>
+                    <p className="text-gray-400 text-sm">Total Revenue</p>
+                    <p className="text-2xl font-bold text-white mt-1">${totalRevenue.toLocaleString()}</p>
                   </div>
+                  <ArrowTrendingUpIcon className="h-8 w-8 text-green-400" />
                 </div>
+                <p className="text-green-400 text-sm mt-2">↑ 12% from last month</p>
               </div>
-              <div className="bg-dark-800 rounded-lg p-4 border border-dark-700">
-                <div className="flex items-center space-x-3">
-                  <CheckCircleIcon className="w-8 h-8 text-green-400" />
+
+              <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-2xl font-bold text-white">{stats.paidInvoices}</p>
-                    <p className="text-dark-300 text-sm">Paid</p>
+                    <p className="text-gray-400 text-sm">Total Expenses</p>
+                    <p className="text-2xl font-bold text-white mt-1">${totalExpenses.toLocaleString()}</p>
                   </div>
+                  <ArrowTrendingDownIcon className="h-8 w-8 text-red-400" />
                 </div>
+                <p className="text-red-400 text-sm mt-2">↓ 5% from last month</p>
               </div>
-              <div className="bg-dark-800 rounded-lg p-4 border border-dark-700">
-                <div className="flex items-center space-x-3">
-                  <ExclamationTriangleIcon className="w-8 h-8 text-red-400" />
+
+              <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-2xl font-bold text-white">{stats.overdueInvoices}</p>
-                    <p className="text-dark-300 text-sm">Overdue</p>
+                    <p className="text-gray-400 text-sm">Net Profit</p>
+                    <p className="text-2xl font-bold text-white mt-1">${netProfit.toLocaleString()}</p>
                   </div>
+                  <CurrencyDollarIcon className="h-8 w-8 text-blue-400" />
                 </div>
+                <p className="text-blue-400 text-sm mt-2">{profitMargin.toFixed(1)}% margin</p>
               </div>
-              <div className="bg-dark-800 rounded-lg p-4 border border-dark-700">
-                <div className="flex items-center space-x-3">
-                  <CurrencyDollarIcon className="w-8 h-8 text-yellow-400" />
+
+              <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-2xl font-bold text-white">${stats.pendingAmount.toLocaleString()}</p>
-                    <p className="text-dark-300 text-sm">Pending</p>
+                    <p className="text-gray-400 text-sm">Outstanding</p>
+                    <p className="text-2xl font-bold text-white mt-1">${outstandingInvoices.toLocaleString()}</p>
                   </div>
+                  <BanknotesIcon className="h-8 w-8 text-yellow-400" />
                 </div>
+                <p className="text-yellow-400 text-sm mt-2">{overdueInvoices.length} overdue</p>
               </div>
             </div>
 
             {/* Invoices Section */}
-            <div className="bg-dark-800 rounded-lg p-6 mb-6 border border-dark-700">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-semibold text-white">Invoices</h3>
-                <div className="flex items-center space-x-4">
-                  <select
-                    value={filterInvoiceStatus}
-                    onChange={(e) => setFilterInvoiceStatus(e.target.value)}
-                    className="bg-dark-700 text-white px-3 py-2 rounded-lg border border-dark-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="all">All Status</option>
-                    <option value="draft">Draft</option>
-                    <option value="sent">Sent</option>
-                    <option value="paid">Paid</option>
-                    <option value="overdue">Overdue</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                  <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2">
-                    <PlusIcon className="w-4 h-4" />
-                    <span>New Invoice</span>
-                  </button>
+            <div className="bg-gray-900 border border-gray-800 rounded-lg">
+              <div className="p-6 border-b border-gray-800">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-white">Invoices</h2>
+                  <div className="flex items-center gap-4">
+                    <select
+                      value={filterInvoiceStatus}
+                      onChange={(e) => setFilterInvoiceStatus(e.target.value)}
+                      className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="draft">Draft</option>
+                      <option value="sent">Sent</option>
+                      <option value="paid">Paid</option>
+                      <option value="overdue">Overdue</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-4">
-                {filteredInvoices.map((invoice) => (
-                  <div key={invoice.id} className="bg-dark-700 rounded-lg p-4 hover:bg-dark-600 transition-colors">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getInvoiceStatusColor(invoice.status)}`}>
-                          {invoice.status}
-                        </span>
-                        <span className="text-lg font-semibold text-white">{invoice.number}</span>
-                        <span className="text-dark-300">|</span>
-                        <span className="text-white">{invoice.clientName}</span>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-white">${invoice.amount.toLocaleString()}</p>
-                        <p className="text-sm text-dark-300">
-                          Due: {new Date(invoice.dueDate).toLocaleDateString()}
-                          {invoice.status === 'overdue' && (
-                            <span className="text-red-400 ml-2">
-                              ({getDaysOverdue(invoice.dueDate)} days overdue)
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-dark-300">Client Email: {invoice.clientEmail}</p>
-                        <p className="text-dark-300">Issue Date: {new Date(invoice.issueDate).toLocaleDateString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-dark-300">Items: {invoice.items.length}</p>
-                        {invoice.notes && (
-                          <p className="text-dark-300">Notes: {invoice.notes}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-800/50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Invoice #</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Client</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Amount</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Issue Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Due Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800">
+                    {filteredInvoices.map((invoice) => (
+                      <tr key={invoice.id} className="hover:bg-gray-800/30">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
+                          {invoice.number}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-white">{invoice.clientName}</div>
+                            <div className="text-sm text-gray-400">{invoice.clientEmail}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-semibold">
+                          ${invoice.amount.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getInvoiceStatusColor(invoice.status)}`}>
+                            {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                          {new Date(invoice.issueDate).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                          {new Date(invoice.dueDate).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                          <button className="text-blue-400 hover:text-blue-300">View</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
 
-            {/* Recent Transactions */}
-            <div className="bg-dark-800 rounded-lg p-6 border border-dark-700">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-semibold text-white">Recent Transactions</h3>
-                <select
-                  value={filterTransactionType}
-                  onChange={(e) => setFilterTransactionType(e.target.value)}
-                  className="bg-dark-700 text-white px-3 py-2 rounded-lg border border-dark-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="all">All Types</option>
-                  <option value="income">Income</option>
-                  <option value="expense">Expense</option>
-                </select>
+            {/* Transactions Section */}
+            <div className="bg-gray-900 border border-gray-800 rounded-lg">
+              <div className="p-6 border-b border-gray-800">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-white">Recent Transactions</h2>
+                  <div className="flex items-center gap-4">
+                    <select
+                      value={filterTransactionType}
+                      onChange={(e) => setFilterTransactionType(e.target.value)}
+                      className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                    >
+                      <option value="all">All Types</option>
+                      <option value="income">Income</option>
+                      <option value="expense">Expense</option>
+                    </select>
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-3">
-                {filteredTransactions.map((transaction) => (
-                  <div key={transaction.id} className="flex items-center justify-between bg-dark-700 rounded-lg p-4">
-                    <div className="flex items-center space-x-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTransactionTypeColor(transaction.type)}`}>
-                        {transaction.type}
-                      </span>
-                      <div>
-                        <p className="text-white font-medium">{transaction.description}</p>
-                        <p className="text-sm text-dark-300">{transaction.category} • {transaction.account}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={`text-lg font-semibold ${transaction.type === 'income' ? 'text-green-400' : 'text-red-400'}`}>
-                        {transaction.type === 'income' ? '+' : '-'}${transaction.amount.toLocaleString()}
-                      </p>
-                      <p className="text-sm text-dark-300">
-                        {new Date(transaction.date).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-800/50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Description</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Category</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Account</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Amount</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800">
+                    {filteredTransactions.map((transaction) => (
+                      <tr key={transaction.id} className="hover:bg-gray-800/30">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                          {new Date(transaction.date).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                          {transaction.description}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                          {transaction.category}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                          {transaction.account}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`text-sm font-semibold ${
+                            transaction.type === 'income' ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {transaction.type === 'income' ? '+' : '-'}${transaction.amount.toLocaleString()}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            transaction.status === 'completed' 
+                              ? 'text-green-400 bg-green-900/20'
+                              : transaction.status === 'pending'
+                              ? 'text-yellow-400 bg-yellow-900/20'
+                              : 'text-gray-400 bg-gray-900/20'
+                          }`}>
+                            {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
-        </div>
+        </main>
       </div>
     </div>
   )
